@@ -1,0 +1,28 @@
+# Version control & IDE
+.git
+.gitignore
+.idea
+.vscode
+.dart_tool
+.metadata
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Flutter Mobile & Desktop application files
+android/
+ios/
+linux/
+macos/
+windows/
+web/
+lib/
+test/
+build/
+pubspec.yaml
+pubspec.lock
+analysis_options.yaml
+myapp.iml
+
+# Documentation & Scripts
+*.md
+*.bat

@@ -1,0 +1,84 @@
+<?php
+require_once __DIR__ . '/db.php';
+
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+if ($method === 'GET') {
+    $user_id = $_GET['user_id'] ?? '';
+    if (!empty($user_id)) {
+        $stmt = $pdo->prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC");
+        $stmt->execute([$user_id]);
+    } else {
+        $stmt = $pdo->query("SELECT * FROM orders ORDER BY id DESC");
+    }
+    $orders = $stmt->fetchAll();
+    echo json_encode(["status" => "success", "data" => $orders]);
+    exit();
+}
+
+if ($method === 'POST') {
+    $data = json_decode(file_get_contents("php://input"), true) ?? $_POST;
+
+    $id = 'ord_' . uniqid();
+    $user_id = $data['user_id'] ?? 'usr_guest';
+    $user_name = $data['user_name'] ?? 'ลูกค้าทั่วไป';
+    $total_amount = floatval($data['total_amount'] ?? 0);
+    $status = 'ชำระเงินแล้ว';
+    $order_date = date('Y-m-d H:i');
+
+    if ($total_amount <= 0) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "ยอดคำสั่งซื้อไม่ถูกต้อง"]);
+        exit();
+    }
+
+    $stmt = $pdo->prepare("INSERT INTO orders (id, user_id, user_name, total_amount, status, order_date) VALUES (?, ?, ?, ?, ?, ?)");
+    $success = $stmt->execute([$id, $user_id, $user_name, $total_amount, $status, $order_date]);
+
+    // Optional stock update
+    if (isset($data['items']) && is_array($data['items'])) {
+        foreach ($data['items'] as $item) {
+            $book_id = $item['id'] ?? '';
+            $qty = intval($item['quantity'] ?? 1);
+            if (!empty($book_id)) {
+                $uStmt = $pdo->prepare("UPDATE books SET stock = CASE WHEN stock >= ? THEN stock - ? ELSE 0 END WHERE id = ?");
+                $uStmt->execute([$qty, $qty, $book_id]);
+            }
+        }
+    }
+
+    if ($success) {
+        echo json_encode([
+            "status" => "success",
+            "message" => "สั่งซื้อหนังสือสำเร็จ ขอบคุณที่ใช้บริการ CaffeBook",
+            "order_id" => $id
+        ]);
+    } else {
+        http_response_code(500);
+        echo json_encode(["status" => "error", "message" => "สร้างคำสั่งซื้อล้มเหลว"]);
+    }
+    exit();
+}
+
+if ($method === 'PUT') {
+    $data = json_decode(file_get_contents("php://input"), true);
+    $id = $data['id'] ?? '';
+    $status = $data['status'] ?? 'จัดส่งแล้ว';
+
+    if (empty($id)) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "ไม่ได้ระบุ Order ID"]);
+        exit();
+    }
+
+    $stmt = $pdo->prepare("UPDATE orders SET status = ? WHERE id = ?");
+    $success = $stmt->execute([$status, $id]);
+
+    if ($success) {
+        echo json_encode(["status" => "success", "message" => "อัปเดตสถานะคำสั่งซื้อเรียบร้อยแล้ว"]);
+    } else {
+        http_response_code(500);
+        echo json_encode(["status" => "error", "message" => "ไม่สามารถอัปเดตสถานะคำสั่งซื้อได้"]);
+    }
+    exit();
+}

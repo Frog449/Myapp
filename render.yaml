@@ -1,0 +1,35 @@
+# ==============================================================================
+# Render.com Blueprint (Infrastructure as Code)
+# Docs: https://render.com/docs/blueprint-spec
+# ==============================================================================
+version: "1"
+
+services:
+  # CaffeBook PHP Backend Web Service
+  - type: web
+    name: caffebook-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    healthCheckPath: /health.php
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      # Default: SQLite driver for instant zero-configuration deployment on Render Free Tier
+      - key: DB_DRIVER
+        value: sqlite
+      # If using external MySQL (TiDB Cloud, Aiven, Railway, Clever Cloud, etc.):
+      # Set DB_DRIVER: mysql and uncomment DATABASE_URL or specific variables:
+      # - key: DATABASE_URL
+      #   sync: false
+      # - key: DB_HOST
+      #   sync: false
+      # - key: DB_NAME
+      #   sync: false
+      # - key: DB_USER
+      #   sync: false
+      # - key: DB_PASSWORD
+      #   sync: false

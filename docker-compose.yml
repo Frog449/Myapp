@@ -1,0 +1,48 @@
+# ==============================================================================
+# Docker Compose for Local Development / Testing
+# Run with: docker compose up --build
+# ==============================================================================
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: caffebook_api
+    restart: always
+    ports:
+      - "8000:80"
+    environment:
+      - APP_ENV=local
+      - DB_DRIVER=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_NAME=myapp
+      - DB_USER=caffe_user
+      - DB_PASSWORD=caffe_secret
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    container_name: caffebook_mysql
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_secret
+      - MYSQL_DATABASE=myapp
+      - MYSQL_USER=caffe_user
+      - MYSQL_PASSWORD=caffe_secret
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_secret"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql_data:
