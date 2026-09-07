@@ -6,8 +6,8 @@ import '../models/user.dart';
 import '../models/order.dart';
 
 class ApiService {
-  // Default server address (Web uses localhost, Mobile uses machine IP)
-  static String _serverHost = kIsWeb ? '127.0.0.1:8000' : '10.169.74.35:8000';
+  // Default live server address (Embedded Render Cloud URL for mobile APK)
+  static String _serverHost = 'https://myapp-2tvy.onrender.com';
 
   static String get serverHost => _serverHost;
 
