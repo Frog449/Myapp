@@ -1,6 +1,321 @@
 <?php
+session_start();
 require_once __DIR__ . '/db.php';
 header("Content-Type: text/html; charset=UTF-8");
+
+// Handle Logout
+if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    unset($_SESSION['admin_user']);
+    session_destroy();
+    header("Location: index.php");
+    exit();
+}
+
+// Handle Login POST
+$login_error = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_email'])) {
+    $email = trim($_POST['login_email'] ?? '');
+    $password = trim($_POST['login_password'] ?? '');
+
+    if (!empty($email) && !empty($password)) {
+        $stmt = $pdo->prepare("SELECT id, name, email, password, role FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch();
+
+        if ($user && ($user['password'] === $password || password_verify($password, $user['password']))) {
+            if ($user['role'] === 'admin') {
+                $_SESSION['admin_user'] = [
+                    'id' => $user['id'],
+                    'name' => $user['name'],
+                    'email' => $user['email'],
+                    'role' => $user['role']
+                ];
+                header("Location: index.php");
+                exit();
+            } else {
+                $login_error = 'บัญชีนี้ไม่มีสิทธิ์เข้าถึงระบบผู้ดูแล (ไม่ใช่ Role Admin)';
+            }
+        } else {
+            $login_error = 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+        }
+    } else {
+        $login_error = 'กรุณากรอกอีเมลและรหัสผ่านให้ครบถ้วน';
+    }
+}
+
+// If Not Logged In, Render Modern Luxury Admin Login Page
+if (!isset($_SESSION['admin_user'])) {
+?>
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>เข้าสู่ระบบผู้ดูแล - CaffeBook Admin</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {
+            --primary: #6F4E37;
+            --primary-dark: #3E2723;
+            --primary-hover: #5A3D28;
+            --primary-light: #C4A482;
+            --accent: #E67E22;
+            --bg-main: #F8F5F0;
+            --card-bg: #FFFFFF;
+            --text-main: #2C2523;
+            --text-muted: #7A726D;
+            --border-color: #EAE3D9;
+            --shadow-lg: 0 20px 45px rgba(62, 39, 35, 0.12);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Prompt', 'Outfit', sans-serif; }
+        body {
+            background: linear-gradient(135deg, #F8F5F0 0%, #EDE4DB 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .login-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            box-shadow: var(--shadow-lg);
+            width: 100%;
+            max-width: 440px;
+            padding: 2.5rem 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .login-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #6F4E37, #E67E22, #C4A482);
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        .login-logo {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border-radius: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 8px 20px rgba(111, 78, 55, 0.25);
+        }
+        .login-title {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 4px;
+        }
+        .login-subtitle {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+        }
+        .form-group {
+            margin-bottom: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .form-group label {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .input-wrapper i.input-icon {
+            position: absolute;
+            left: 14px;
+            color: var(--primary-light);
+            font-size: 1rem;
+        }
+        .form-control {
+            width: 100%;
+            padding: 12px 14px 12px 42px;
+            border: 1.5px solid var(--border-color);
+            border-radius: 12px;
+            font-size: 0.95rem;
+            background: #FAF8F5;
+            color: var(--text-main);
+            outline: none;
+            transition: all 0.2s ease;
+        }
+        .form-control:focus {
+            background: white;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(111, 78, 55, 0.15);
+        }
+        .toggle-password {
+            position: absolute;
+            right: 14px;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+        .alert-error {
+            background: #FDEDEC;
+            border: 1px solid #F5B7B1;
+            color: #C0392B;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-size: 0.88rem;
+            margin-bottom: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 13px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 6px 16px rgba(111, 78, 55, 0.25);
+            transition: all 0.2s ease;
+            margin-top: 0.5rem;
+        }
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 22px rgba(111, 78, 55, 0.35);
+        }
+        .quick-login-box {
+            margin-top: 1.5rem;
+            padding-top: 1.25rem;
+            border-top: 1px dashed var(--border-color);
+            text-align: center;
+        }
+        .quick-login-title {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .quick-btn-group {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn-quick {
+            padding: 6px 12px;
+            background: #F5EBE6;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            font-size: 0.78rem;
+            color: var(--primary-dark);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-quick:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="login-header">
+            <div class="login-logo"><i class="fa-solid fa-mug-hot"></i></div>
+            <h1 class="login-title">Caffe<b>Book</b> Admin</h1>
+            <p class="login-subtitle">ระบบจัดการสต็อกหนังสือและคำสั่งซื้อหลังบ้าน</p>
+        </div>
+
+        <?php if (!empty($login_error)): ?>
+            <div class="alert-error">
+                <i class="fa-solid fa-circle-exclamation"></i>
+                <span><?= htmlspecialchars($login_error) ?></span>
+            </div>
+        <?php endif; ?>
+
+        <form method="POST" action="index.php">
+            <div class="form-group">
+                <label for="login_email">อีเมลผู้ดูแลระบบ</label>
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-envelope input-icon"></i>
+                    <input type="email" id="login_email" name="login_email" class="form-control" placeholder="เช่น Safe@gmail.com" required autocomplete="username">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="login_password">รหัสผ่าน</label>
+                <div class="input-wrapper">
+                    <i class="fa-solid fa-lock input-icon"></i>
+                    <input type="password" id="login_password" name="login_password" class="form-control" placeholder="กรอกรหัสผ่าน" required autocomplete="current-password">
+                    <i class="fa-solid fa-eye toggle-password" onclick="togglePass()"></i>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-submit">
+                <i class="fa-solid fa-right-to-bracket"></i> เข้าสู่ระบบ
+            </button>
+        </form>
+
+        <div class="quick-login-box">
+            <div class="quick-login-title">คลิกเพื่อกรอกบัญชีผู้ดูแลอัตโนมัติ</div>
+            <div class="quick-btn-group">
+                <button type="button" class="btn-quick" onclick="fillAccount('Safe@gmail.com', 'Safe2649')">
+                    👑 Safe (Safe@gmail.com)
+                </button>
+                <button type="button" class="btn-quick" onclick="fillAccount('admin@caffebook.com', 'admin123')">
+                    ☕ Admin ทั่วไป
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function togglePass() {
+            const input = document.getElementById('login_password');
+            const icon = document.querySelector('.toggle-password');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+        function fillAccount(email, password) {
+            document.getElementById('login_email').value = email;
+            document.getElementById('login_password').value = password;
+        }
+    </script>
+</body>
+</html>
+<?php
+    exit();
+}
+
+$currentUser = $_SESSION['admin_user'];
 
 // Fetch Statistics
 $total_revenue = $pdo->query("SELECT COALESCE(SUM(total_amount), 0) FROM orders WHERE status != 'ยกเลิก'")->fetchColumn();
@@ -1522,12 +1837,22 @@ $categories = ['ทั้งหมด', 'นิยาย', 'พัฒนาต�
                 <div class="dot"></div>
                 <span>Server & Database Online</span>
             </div>
+            <button class="btn btn-sm" onclick="syncFullCatalog()" style="background: #FEF5E7; color: #E67E22; border: 1px solid #FADBD8; font-weight: 600;" title="กู้คืนและนำเข้าหนังสือทั้ง 15 เล่มจากฐานข้อมูลเดิม">
+                <i class="fa-solid fa-arrows-rotate"></i> ซิงค์หนังสือ 15 เล่ม
+            </button>
             <a href="download_apk.php" class="btn-nav-apk">
                 <i class="fa-solid fa-mobile-screen-button"></i> โหลดแอป APK
             </a>
             <button class="btn btn-primary btn-sm" onclick="openAddBookModal()">
                 <i class="fa-solid fa-plus"></i> เพิ่มหนังสือ
             </button>
+            <div class="user-profile-badge" style="display: flex; align-items: center; gap: 8px; margin-left: 6px; padding: 4px 12px; background: #F5EBE6; border-radius: 20px; font-size: 0.85rem; color: #3E2723; font-weight: 600; border: 1px solid #EAE3D9;">
+                <i class="fa-solid fa-circle-user" style="color: #6F4E37; font-size: 1.15rem;"></i>
+                <span><?= htmlspecialchars($currentUser['name'] ?? 'Admin') ?></span>
+                <a href="index.php?action=logout" style="color: #E74C3C; text-decoration: none; margin-left: 4px; padding: 2px 6px; border-radius: 6px;" title="ออกจากระบบ">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </a>
+            </div>
         </div>
     </header>
 
@@ -3056,6 +3381,48 @@ $categories = ['ทั้งหมด', 'นิยาย', 'พัฒนาต�
                     } else {
                         Swal.fire('ข้อผิดพลาด', data.message, 'error');
                     }
+                }
+            });
+        }
+
+        // Sync and Restore Full 15 Books Catalog
+        function syncFullCatalog() {
+            Swal.fire({
+                title: 'ซิงค์หนังสือครบทั้ง 15 เล่ม?',
+                text: 'ระบบจะทำการนำเข้าหนังสือทั้งหมด 15 เล่ม พร้อมรูปภาพปกและรายละเอียดสมบูรณ์เข้าสู่ฐานข้อมูล',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#6F4E37',
+                cancelButtonColor: '#7A726D',
+                confirmButtonText: '<i class="fa-solid fa-arrows-rotate"></i> ซิงค์ข้อมูลเดี๋ยวนี้',
+                cancelButtonText: 'ยกเลิก'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'กำลังซิงค์ข้อมูล...',
+                        text: 'กรุณารอสักครู่',
+                        allowOutsideClick: false,
+                        didOpen: () => { Swal.showLoading(); }
+                    });
+                    fetch('admin_actions.php?action=restore_full_catalog')
+                        .then(r => r.json())
+                        .then(res => {
+                            if (res.status === 'success') {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'สำเร็จ!',
+                                    text: res.message,
+                                    confirmButtonColor: '#6F4E37'
+                                }).then(() => {
+                                    location.reload();
+                                });
+                            } else {
+                                Swal.fire('เกิดข้อผิดพลาด', res.message || 'ไม่สามารถซิงค์ได้', 'error');
+                            }
+                        })
+                        .catch(err => {
+                            Swal.fire('ข้อผิดพลาด', err.message, 'error');
+                        });
                 }
             });
         }
