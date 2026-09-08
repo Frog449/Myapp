@@ -338,7 +338,52 @@ class _MyOrdersDialogState extends State<MyOrdersDialog> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+
+          // Items summary
+          if (order.items.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: CafeTheme.latteCream.withOpacity(0.35),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: CafeTheme.cardBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'รายการหนังสือที่สั่งซื้อ:',
+                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: CafeTheme.roastedCoffee),
+                  ),
+                  const SizedBox(height: 3),
+                  ...order.items.map((it) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 1.5),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.book_outlined, size: 12, color: CafeTheme.warmAmber),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                it.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 11.5, color: CafeTheme.roastedCoffee),
+                              ),
+                            ),
+                            Text(
+                              'x${it.quantity} (฿${(it.price * it.quantity).toStringAsFixed(0)})',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: CafeTheme.textMuted),
+                            ),
+                          ],
+                        ),
+                      )),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 10),
 
           // Order Tracking Timeline Bar
           if (order.status != 'ยกเลิก') ...[

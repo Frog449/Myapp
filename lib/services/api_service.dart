@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/book.dart';
 import '../models/user.dart';
@@ -198,4 +197,14 @@ class ApiService {
     final data = jsonDecode(response.body);
     return data['status'] == 'success';
   }
+
+  static Future<bool> deleteOrder(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/orders.php?id=$id'),
+      headers: {'Content-Type': 'application/json; charset=UTF-8'},
+    );
+    final data = jsonDecode(response.body);
+    return data['status'] == 'success';
+  }
 }
+

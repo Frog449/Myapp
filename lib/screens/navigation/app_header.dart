@@ -512,7 +512,7 @@ class _AppHeaderState extends State<AppHeader> {
     showDialog(
       context: context,
       builder: (ctx) {
-        return const _CartDialogContent();
+        return _CartDialogContent(parentContext: context);
       },
     );
   }
@@ -520,7 +520,8 @@ class _AppHeaderState extends State<AppHeader> {
 
 // Shopping Cart Modal Component
 class _CartDialogContent extends StatefulWidget {
-  const _CartDialogContent();
+  final BuildContext parentContext;
+  const _CartDialogContent({required this.parentContext});
 
   @override
   State<_CartDialogContent> createState() => _CartDialogContentState();
@@ -682,7 +683,7 @@ class _CartDialogContentState extends State<_CartDialogContent> {
                                 ],
                               ),
                             ),
-                            // Stepper Controls
+                            // Quantity Controls
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -734,27 +735,66 @@ class _CartDialogContentState extends State<_CartDialogContent> {
 
                   const SizedBox(height: 12),
 
-                  // Guest Name Field if not logged in
-                  if (!auth.isLoggedIn) ...[
-                    TextField(
-                      controller: _guestNameController,
-                      style: const TextStyle(fontSize: 13),
-                      decoration: const InputDecoration(
-                        labelText: 'ชื่อผู้สั่งซื้อ (สำหรับจัดส่ง)',
-                        labelStyle: TextStyle(fontSize: 12),
-                        prefixIcon: Icon(Icons.person_outline, size: 18),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  // Login Notice if Guest
+                  if (!auth.isLoggedIn)
+                    Container(
+                      margin: const EdgeInsets.only(top: 8, bottom: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFFFEDD5)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.lock_person_rounded, color: CafeTheme.warmAmber, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                'ต้องเข้าสู่ระบบก่อนสั่งซื้อ',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: CafeTheme.roastedCoffee,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'กรุณาเข้าสู่ระบบด้วยบัญชีสมาชิกเพื่อบันทึกรายการคำสั่งซื้อลงฐานข้อมูล',
+                            style: TextStyle(fontSize: 12, color: CafeTheme.espresso),
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                                AuthDialogs.showLoginDialog(context);
+                              },
+                              icon: const Icon(Icons.login_rounded, size: 16),
+                              label: const Text('เข้าสู่ระบบตอนนี้'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: CafeTheme.warmAmber,
+                                side: const BorderSide(color: CafeTheme.warmAmber),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 12),
-                  ],
 
-                  // Total & Summary Box
+                  // Order Summary
                   Container(
-                    padding: const EdgeInsets.all(14),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: CafeTheme.latteCream.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(14),
+                      color: CafeTheme.latteCream.withOpacity(0.35),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: CafeTheme.cardBorder),
                     ),
                     child: Column(
@@ -762,7 +802,7 @@ class _CartDialogContentState extends State<_CartDialogContent> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text('ยอดรวมสินค้า:', style: TextStyle(fontSize: 13, color: CafeTheme.textMuted)),
+                            const Text('ราคารวมสินค้า:', style: TextStyle(fontSize: 13, color: CafeTheme.textMuted)),
                             Text('฿${cart.totalAmount.toStringAsFixed(2)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                           ],
                         ),
@@ -804,25 +844,44 @@ class _CartDialogContentState extends State<_CartDialogContent> {
                     ? null
                     : () async {
                         final nav = Navigator.of(context);
-                        final messenger = ScaffoldMessenger.of(context);
+                        final parentCtx = widget.parentContext;
+                        final messenger = ScaffoldMessenger.of(parentCtx);
+
+                        // Enforce login before checkout
+                        if (!auth.isLoggedIn) {
+                          nav.pop();
+                          if (parentCtx.mounted) {
+                            AuthDialogs.showLoginDialog(parentCtx);
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('กรุณาเข้าสู่ระบบก่อนทำการยืนยันสั่งซื้อหนังสือ'),
+                                backgroundColor: CafeTheme.espresso,
+                                duration: Duration(seconds: 3),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+
                         setState(() => _isCheckingOut = true);
                         try {
-                          final userId = auth.isLoggedIn ? auth.currentUser!.id : 'guest_${DateTime.now().millisecondsSinceEpoch}';
-                          final userName = auth.isLoggedIn
-                              ? auth.currentUser!.name
-                              : (_guestNameController.text.trim().isNotEmpty
-                                  ? _guestNameController.text.trim()
-                                  : 'ลูกค้าทั่วไป');
+                          final userId = auth.currentUser!.id;
+                          final userName = auth.currentUser!.name;
 
                           final ok = await cart.checkout(userId, userName);
                           if (ok) {
                             nav.pop();
                             messenger.showSnackBar(
                               const SnackBar(
-                                content: Text('🎉 สั่งซื้อหนังสือสำเร็จเรียบร้อยแล้ว ขอบคุณที่ใช้บริการ!'),
+                                content: Text('🎉 สั่งซื้อหนังสือสำเร็จเรียบร้อยแล้ว ขอบคุณที่ใช้บริการ CaffeBook!'),
                                 backgroundColor: CafeTheme.successGreen,
+                                duration: Duration(seconds: 4),
                               ),
                             );
+                            // Open order history dialog to confirm
+                            if (parentCtx.mounted) {
+                              MyOrdersDialog.show(parentCtx);
+                            }
                           } else {
                             messenger.showSnackBar(
                               const SnackBar(
@@ -837,10 +896,14 @@ class _CartDialogContentState extends State<_CartDialogContent> {
                       },
                 icon: _isCheckingOut
                     ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.check_circle_outline_rounded, size: 16),
-                label: Text(_isCheckingOut ? 'กำลังดำเนินการ...' : 'ยืนยันการสั่งซื้อ'),
+                    : Icon(!auth.isLoggedIn ? Icons.lock_outline_rounded : Icons.check_circle_outline_rounded, size: 16),
+                label: Text(
+                  _isCheckingOut
+                      ? 'กำลังดำเนินการ...'
+                      : (!auth.isLoggedIn ? 'เข้าสู่ระบบเพื่อสั่งซื้อ' : 'ยืนยันการสั่งซื้อ'),
+                ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: CafeTheme.warmAmber,
+                  backgroundColor: !auth.isLoggedIn ? CafeTheme.espresso : CafeTheme.warmAmber,
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
                 ),
               ),

@@ -336,6 +336,33 @@ $users = $pdo->query("SELECT id, name, email, role, created_at FROM users ORDER 
 // Category counts for dynamic filter chips
 $category_counts_raw = $pdo->query("SELECT category, COUNT(*) as cnt FROM books GROUP BY category")->fetchAll(PDO::FETCH_KEY_PAIR);
 $categories = ['ทั้งหมด', 'นิยาย', 'พัฒนาตนเอง', 'ธุรกิจ/บริหาร', 'วรรณกรรม', 'การ์ตูน/มังงะ'];
+
+function renderOrderItemsHtml($items_json) {
+    if (empty($items_json)) {
+        return '<span style="color:var(--text-muted); font-size:0.82rem;">(ไม่มีรายละเอียดรายการ)</span>';
+    }
+    $items = json_decode($items_json, true);
+    if (!is_array($items) || empty($items)) {
+        return '<span style="color:var(--text-muted); font-size:0.82rem;">' . htmlspecialchars($items_json) . '</span>';
+    }
+    $html = '<div class="order-items-list">';
+    foreach ($items as $it) {
+        $title = htmlspecialchars($it['title'] ?? 'หนังสือ');
+        $qty = intval($it['quantity'] ?? 1);
+        $price = floatval($it['price'] ?? 0);
+        $subtotal = $qty * $price;
+        $html .= '<div class="order-item-pill" title="' . $title . '">';
+        $html .= '<i class="fa-solid fa-book"></i>';
+        $html .= '<span class="item-title">' . $title . '</span>';
+        $html .= '<span class="item-qty">×' . $qty . '</span>';
+        if ($price > 0) {
+            $html .= '<span class="item-subtotal">฿' . number_format($subtotal, 0) . '</span>';
+        }
+        $html .= '</div>';
+    }
+    $html .= '</div>';
+    return $html;
+}
 ?>
 <!DOCTYPE html>
 <html lang="th">
@@ -1799,27 +1826,187 @@ $categories = ['ทั้งหมด', 'นิยาย', 'พัฒนาต�
             overflow-y: auto;
         }
 
+        /* Order Items Breakdown Pills */
+        .order-items-list {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            max-width: 320px;
+        }
+
+        .order-item-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #FAF7F2;
+            border: 1px solid #EAE3D9;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            color: var(--text-main);
+            line-height: 1.3;
+        }
+
+        .order-item-pill i {
+            color: var(--primary);
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        .order-item-pill .item-title {
+            max-width: 170px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 500;
+        }
+
+        .order-item-pill .item-qty {
+            background: var(--primary-soft);
+            color: var(--primary-dark);
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        .order-item-pill .item-subtotal {
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            font-family: 'Outfit', sans-serif;
+            flex-shrink: 0;
+        }
+
         /* Responsive Layout Breakpoints */
-        @media (max-width: 992px) {
+        @media (max-width: 1024px) {
             .admin-container {
                 flex-direction: column;
                 padding: 1rem;
-                gap: 1rem;
+                gap: 1.2rem;
             }
             .sidebar {
                 width: 100%;
                 flex-direction: row;
                 overflow-x: auto;
                 padding-bottom: 6px;
+                -webkit-overflow-scrolling: touch;
+                gap: 8px;
             }
             .nav-item {
                 white-space: nowrap;
+                padding: 10px 14px;
+                font-size: 0.88rem;
+                flex-shrink: 0;
             }
             .sidebar-divider, .api-info-card {
                 display: none;
             }
+            .stats-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 1rem;
+            }
+        }
+
+        @media (max-width: 768px) {
             .navbar {
-                padding: 0.8rem 1rem;
+                padding: 0.75rem 1rem;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            .nav-status {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 8px;
+                justify-content: flex-start;
+            }
+            .brand-logo {
+                font-size: 1.2rem;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.8rem;
+            }
+            .stat-card {
+                padding: 1rem;
+            }
+            .stat-icon {
+                width: 44px;
+                height: 44px;
+                font-size: 1.1rem;
+            }
+            .stat-info h3 {
+                font-size: 1.2rem;
+            }
+            .book-kpi-bar {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.6rem;
+            }
+            .card-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.8rem;
+            }
+            .card-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .toolbar-top-row {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 0.8rem;
+            }
+            .search-box-wrapper {
+                min-width: 100%;
+            }
+            .filter-controls-group {
+                width: 100%;
+                justify-content: space-between;
+                flex-wrap: wrap;
+            }
+            .modal-content {
+                margin: 8px;
+                max-height: 94vh;
+                border-radius: 14px;
+            }
+            .modal-body {
+                padding: 1.1rem;
+            }
+            .modal-header, .modal-footer {
+                padding: 1rem 1.1rem;
+            }
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 0.75rem;
+            }
+            .bulk-actions-bar {
+                width: calc(100% - 24px);
+                left: 12px;
+                transform: translateY(100px);
+                justify-content: space-between;
+                padding: 8px 14px;
+                font-size: 0.8rem;
+            }
+            .bulk-actions-bar.active {
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            .book-kpi-bar {
+                grid-template-columns: 1fr;
+            }
+            .books-grid-view {
+                grid-template-columns: 1fr;
+            }
+            .status-badge span {
+                display: none;
             }
         }
     </style>
@@ -1951,6 +2138,7 @@ $categories = ['ทั้งหมด', 'นิยาย', 'พัฒนาต�
                                 <tr>
                                     <th>รหัสคำสั่งซื้อ</th>
                                     <th>ลูกค้า</th>
+                                    <th>รายการที่สั่ง</th>
                                     <th>ยอดชำระ</th>
                                     <th>วันที่สั่งซื้อ</th>
                                     <th>สถานะ</th>
@@ -1958,14 +2146,15 @@ $categories = ['ทั้งหมด', 'นิยาย', 'พัฒนาต�
                             </thead>
                             <tbody>
                                 <?php if (empty($orders)): ?>
-                                    <tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding: 2rem;">ยังไม่มีรายการสั่งซื้อ</td></tr>
+                                    <tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding: 2rem;">ยังไม่มีรายการสั่งซื้อ</td></tr>
                                 <?php else: ?>
                                     <?php foreach (array_slice($orders, 0, 5) as $ord): ?>
                                     <tr>
                                         <td><strong><?= htmlspecialchars($ord['id']) ?></strong></td>
                                         <td><?= htmlspecialchars($ord['user_name'] ?? 'ลูกค้า') ?></td>
-                                        <td style="font-weight:600; color:var(--primary-dark);">฿<?= number_format($ord['total_amount'], 2) ?></td>
-                                        <td style="color:var(--text-muted); font-size:0.85rem;"><?= htmlspecialchars($ord['order_date']) ?></td>
+                                        <td><?= renderOrderItemsHtml($ord['items_detail'] ?? '') ?></td>
+                                        <td style="font-weight:600; color:var(--primary-dark); white-space:nowrap;">฿<?= number_format($ord['total_amount'], 2) ?></td>
+                                        <td style="color:var(--text-muted); font-size:0.85rem; white-space:nowrap;"><?= htmlspecialchars($ord['order_date']) ?></td>
                                         <td>
                                             <span class="badge <?= $ord['status'] === 'จัดส่งแล้ว' || $ord['status'] === 'ชำระเงินแล้ว' ? 'badge-success' : ($ord['status'] === 'ยกเลิก' ? 'badge-danger' : 'badge-warning') ?>">
                                                 <?= htmlspecialchars($ord['status']) ?>
@@ -2294,6 +2483,7 @@ $categories = ['ทั้งหมด', 'นิยาย', 'พัฒนาต�
                                 <tr>
                                     <th>รหัสคำสั่งซื้อ</th>
                                     <th>ชื่อลูกค้า</th>
+                                    <th>รายการหนังสือที่สั่งซื้อ</th>
                                     <th>ยอดรวม</th>
                                     <th>วันที่สั่งซื้อ</th>
                                     <th>สถานะปัจจุบัน</th>
@@ -2302,19 +2492,26 @@ $categories = ['ทั้งหมด', 'นิยาย', 'พัฒนาต�
                                 </tr>
                             </thead>
                             <tbody>
+                                <?php if (empty($orders)): ?>
+                                <tr><td colspan="8" style="text-align:center; color: var(--text-muted); padding: 2.5rem;">ยังไม่มีคำสั่งซื้อในระบบ</td></tr>
+                                <?php else: ?>
                                 <?php foreach ($orders as $ord): ?>
                                 <tr>
-                                    <td><strong><?= htmlspecialchars($ord['id']) ?></strong></td>
-                                    <td><?= htmlspecialchars($ord['user_name'] ?? 'ลูกค้า') ?></td>
-                                    <td style="font-weight:700; color:var(--primary-dark); font-family:'Outfit','Prompt',sans-serif;">฿<?= number_format($ord['total_amount'], 2) ?></td>
-                                    <td style="color:var(--text-muted); font-size:0.85rem;"><?= htmlspecialchars($ord['order_date']) ?></td>
+                                    <td><strong style="color:var(--primary-dark); font-family:monospace;"><?= htmlspecialchars($ord['id']) ?></strong></td>
+                                    <td>
+                                        <div style="font-weight:600; color:var(--text-main);"><?= htmlspecialchars($ord['user_name'] ?? 'ลูกค้า') ?></div>
+                                        <div style="font-size:0.75rem; color:var(--text-muted);">User ID: <?= htmlspecialchars($ord['user_id'] ?? '-') ?></div>
+                                    </td>
+                                    <td><?= renderOrderItemsHtml($ord['items_detail'] ?? '') ?></td>
+                                    <td style="font-weight:700; color:var(--primary-dark); font-family:'Outfit','Prompt',sans-serif; white-space:nowrap;">฿<?= number_format($ord['total_amount'], 2) ?></td>
+                                    <td style="color:var(--text-muted); font-size:0.82rem; white-space:nowrap;"><?= htmlspecialchars($ord['order_date']) ?></td>
                                     <td>
                                         <span class="badge <?= $ord['status'] === 'จัดส่งแล้ว' || $ord['status'] === 'ชำระเงินแล้ว' ? 'badge-success' : ($ord['status'] === 'ยกเลิก' ? 'badge-danger' : 'badge-warning') ?>">
                                             <?= htmlspecialchars($ord['status']) ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <select class="select-filter" style="padding: 6px 10px; font-size: 0.84rem;" onchange="updateOrderStatus('<?= $ord['id'] ?>', this.value)">
+                                        <select class="select-filter" style="padding: 6px 10px; font-size: 0.84rem; width:130px;" onchange="updateOrderStatus('<?= $ord['id'] ?>', this.value)">
                                             <option value="รอชำระเงิน" <?= $ord['status'] === 'รอชำระเงิน' ? 'selected' : '' ?>>รอชำระเงิน</option>
                                             <option value="ชำระเงินแล้ว" <?= $ord['status'] === 'ชำระเงินแล้ว' ? 'selected' : '' ?>>ชำระเงินแล้ว</option>
                                             <option value="กำลังจัดส่ง" <?= $ord['status'] === 'กำลังจัดส่ง' ? 'selected' : '' ?>>กำลังจัดส่ง</option>
@@ -2329,6 +2526,7 @@ $categories = ['ทั้งหมด', 'นิยาย', 'พัฒนาต�
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                     </div>

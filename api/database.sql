@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS `orders` (
     `user_name` VARCHAR(255) NOT NULL,
     `total_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     `status` VARCHAR(50) NOT NULL DEFAULT 'ชำระเงินแล้ว',
+    `items_detail` TEXT,
     `order_date` VARCHAR(50) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -69,6 +70,6 @@ INSERT IGNORE INTO `books` (`id`, `title`, `author`, `price`, `stock`, `category
 ('b_002', 'คิดแบบยิวทำแบบญี่ปุ่น', 'ฮอนดะ เคน', 230.00, 16, 'ธุรกิจ/บริหาร', 'https://images.weserv.nl/?url=https%3A%2F%2Fstorage.naiin.com%2Fsystem%2Fapplication%2Fbookstore%2Fresource%2Fproduct%2F202601%2F695304%2F6000124480_front_XXL.jpg%3Fv%3D1769769191', 'ยอดขายทะลุ 3 ล้านเล่มในญี่ปุ่น สร้างความมั่งคั่งและความสุขให้เกิดขึ้นในชีวิต', 4.90, 281, 0);
 
 -- Initial Orders
-INSERT IGNORE INTO `orders` (`id`, `user_id`, `user_name`, `total_amount`, `status`, `order_date`) VALUES
-('ord_001', 'usr_demo', 'สมชาย ใจดี', 590.00, 'จัดส่งแล้ว', DATE_SUB(NOW(), INTERVAL 2 DAY)),
-('ord_002', 'usr_demo', 'สมชาย ใจดี', 295.00, 'ชำระเงินแล้ว', NOW());
+INSERT IGNORE INTO `orders` (`id`, `user_id`, `user_name`, `total_amount`, `status`, `items_detail`, `order_date`) VALUES
+('ord_001', 'usr_demo', 'สมชาย ใจดี', 590.00, 'จัดส่งแล้ว', '[{\"id\":\"b_001\",\"title\":\"กล้าที่จะถูกเกลียด\",\"price\":295.0,\"quantity\":2}]', DATE_SUB(NOW(), INTERVAL 2 DAY)),
+('ord_002', 'usr_demo', 'สมชาย ใจดี', 295.00, 'ชำระเงินแล้ว', '[{\"id\":\"b_6a9672e44c922\",\"title\":\"THE LITTLE FROG’S GUIDE TO SELF-CARE\",\"price\":295.0,\"quantity\":1}]', NOW());

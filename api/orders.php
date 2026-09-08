@@ -20,11 +20,19 @@ if ($method === 'POST') {
     $data = json_decode(file_get_contents("php://input"), true) ?? $_POST;
 
     $id = 'ord_' . uniqid();
-    $user_id = $data['user_id'] ?? 'usr_guest';
-    $user_name = $data['user_name'] ?? 'ลูกค้าทั่วไป';
+    $user_id = trim($data['user_id'] ?? 'usr_guest');
+    $user_name = trim($data['user_name'] ?? 'ลูกค้าทั่วไป');
     $total_amount = floatval($data['total_amount'] ?? 0);
     $status = 'ชำระเงินแล้ว';
     $order_date = date('Y-m-d H:i');
+    
+    // Process items detail
+    $items = $data['items'] ?? [];
+    if (is_array($items) && count($items) > 0) {
+        $items_detail = json_encode($items, JSON_UNESCAPED_UNICODE);
+    } else {
+        $items_detail = is_string($data['items_detail'] ?? null) ? $data['items_detail'] : '[]';
+    }
 
     if ($total_amount <= 0) {
         http_response_code(400);
@@ -32,15 +40,15 @@ if ($method === 'POST') {
         exit();
     }
 
-    $stmt = $pdo->prepare("INSERT INTO orders (id, user_id, user_name, total_amount, status, order_date) VALUES (?, ?, ?, ?, ?, ?)");
-    $success = $stmt->execute([$id, $user_id, $user_name, $total_amount, $status, $order_date]);
+    $stmt = $pdo->prepare("INSERT INTO orders (id, user_id, user_name, total_amount, status, items_detail, order_date) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $success = $stmt->execute([$id, $user_id, $user_name, $total_amount, $status, $items_detail, $order_date]);
 
-    // Optional stock update
-    if (isset($data['items']) && is_array($data['items'])) {
-        foreach ($data['items'] as $item) {
+    // Stock update in database
+    if (is_array($items)) {
+        foreach ($items as $item) {
             $book_id = $item['id'] ?? '';
             $qty = intval($item['quantity'] ?? 1);
-            if (!empty($book_id)) {
+            if (!empty($book_id) && $qty > 0) {
                 $uStmt = $pdo->prepare("UPDATE books SET stock = CASE WHEN stock >= ? THEN stock - ? ELSE 0 END WHERE id = ?");
                 $uStmt->execute([$qty, $qty, $book_id]);
             }
@@ -61,9 +69,9 @@ if ($method === 'POST') {
 }
 
 if ($method === 'PUT') {
-    $data = json_decode(file_get_contents("php://input"), true);
-    $id = $data['id'] ?? '';
-    $status = $data['status'] ?? 'จัดส่งแล้ว';
+    $data = json_decode(file_get_contents("php://input"), true) ?? $_POST;
+    $id = trim($data['id'] ?? '');
+    $status = trim($data['status'] ?? 'จัดส่งแล้ว');
 
     if (empty($id)) {
         http_response_code(400);
@@ -79,6 +87,28 @@ if ($method === 'PUT') {
     } else {
         http_response_code(500);
         echo json_encode(["status" => "error", "message" => "ไม่สามารถอัปเดตสถานะคำสั่งซื้อได้"]);
+    }
+    exit();
+}
+
+if ($method === 'DELETE') {
+    $data = json_decode(file_get_contents("php://input"), true);
+    $id = trim($_GET['id'] ?? ($data['id'] ?? ''));
+
+    if (empty($id)) {
+        http_response_code(400);
+        echo json_encode(["status" => "error", "message" => "ไม่ได้ระบุ Order ID สำหรับลบ"]);
+        exit();
+    }
+
+    $stmt = $pdo->prepare("DELETE FROM orders WHERE id = ?");
+    $success = $stmt->execute([$id]);
+
+    if ($success) {
+        echo json_encode(["status" => "success", "message" => "ลบรายการคำสั่งซื้อสำเร็จ"]);
+    } else {
+        http_response_code(500);
+        echo json_encode(["status" => "error", "message" => "ไม่สามารถลบรายการคำสั่งซื้อได้"]);
     }
     exit();
 }

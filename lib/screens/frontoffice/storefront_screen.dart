@@ -2,9 +2,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/book.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/book_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../theme/cafe_theme.dart';
+import '../auth/auth_dialogs.dart';
 
 class StorefrontScreen extends StatelessWidget {
   const StorefrontScreen({super.key});
@@ -235,10 +237,10 @@ class StorefrontScreen extends StatelessWidget {
 
                           if (constraints.maxWidth < 500) {
                             crossAxisCount = 2;
-                            childAspectRatio = 0.53;
+                            childAspectRatio = 0.50;
                           } else if (constraints.maxWidth < 800) {
                             crossAxisCount = 3;
-                            childAspectRatio = 0.58;
+                            childAspectRatio = 0.56;
                           } else if (constraints.maxWidth < 1150) {
                             crossAxisCount = 4;
                             childAspectRatio = 0.62;
@@ -673,6 +675,18 @@ class _FeaturedBookCard extends StatelessWidget {
                     ElevatedButton(
                       onPressed: book.stock > 0
                           ? () {
+                              final auth = Provider.of<AuthProvider>(context, listen: false);
+                              if (!auth.isLoggedIn) {
+                                AuthDialogs.showLoginDialog(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('กรุณาเข้าสู่ระบบก่อนทำการสั่งซื้อหนังสือ'),
+                                    backgroundColor: CafeTheme.espresso,
+                                    duration: Duration(seconds: 3),
+                                  ),
+                                );
+                                return;
+                              }
                               cart.addItem(book);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -871,6 +885,18 @@ class _Book3DCard extends StatelessWidget {
                     child: ElevatedButton.icon(
                       onPressed: book.stock > 0
                           ? () {
+                              final auth = Provider.of<AuthProvider>(context, listen: false);
+                              if (!auth.isLoggedIn) {
+                                AuthDialogs.showLoginDialog(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('กรุณาเข้าสู่ระบบก่อนทำการสั่งซื้อหนังสือ'),
+                                    backgroundColor: CafeTheme.espresso,
+                                    duration: Duration(seconds: 3),
+                                  ),
+                                );
+                                return;
+                              }
                               cart.addItem(book);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -1060,6 +1086,19 @@ class _Book3DCard extends StatelessWidget {
                                       const SizedBox(width: 12),
                                       ElevatedButton.icon(
                                         onPressed: () {
+                                          final auth = Provider.of<AuthProvider>(context, listen: false);
+                                          if (!auth.isLoggedIn) {
+                                            Navigator.of(ctx).pop();
+                                            AuthDialogs.showLoginDialog(context);
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('กรุณาเข้าสู่ระบบก่อนทำการสั่งซื้อหนังสือ'),
+                                                backgroundColor: CafeTheme.espresso,
+                                                duration: Duration(seconds: 3),
+                                              ),
+                                            );
+                                            return;
+                                          }
                                           for (int i = 0; i < qty; i++) {
                                             cart.addItem(book);
                                           }

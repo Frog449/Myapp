@@ -49,7 +49,16 @@ $options = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     PDO::ATTR_EMULATE_PREPARES   => false,
+    PDO::ATTR_TIMEOUT            => 5,
 ];
+
+// If connecting to TiDB Cloud or Remote MySQL requiring SSL
+if (defined('PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT')) {
+    $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+}
+if (defined('PDO::MYSQL_ATTR_SSL_CA') && file_exists('/etc/ssl/certs/ca-certificates.crt')) {
+    $options[PDO::MYSQL_ATTR_SSL_CA] = '/etc/ssl/certs/ca-certificates.crt';
+}
 
 try {
     if (strtolower($dbDriver) === 'sqlite') {
@@ -58,7 +67,7 @@ try {
         $pdo = new PDO("sqlite:$sqlitePath", null, null, $options);
         $pdo->exec("PRAGMA journal_mode = WAL;");
     } else {
-        // MySQL Driver
+        // MySQL Driver (Supports TiDB Cloud, Aiven, Railway, Local MySQL)
         $dsn = "mysql:host=$host;port=$port;dbname=$db;charset=$charset";
         try {
             $pdo = new PDO($dsn, $user, $pass, $options);
@@ -71,6 +80,12 @@ try {
                 } catch (\Exception $createEx) {
                     throw $e;
                 }
+            } else if (($host === '127.0.0.1' || $host === 'localhost') && empty($databaseUrl)) {
+                // Graceful fallback to SQLite if local MySQL is not running inside Docker
+                $dbDriver = 'sqlite';
+                $sqlitePath = getenv('SQLITE_PATH') ?: __DIR__ . '/database.sqlite';
+                $pdo = new PDO("sqlite:$sqlitePath", null, null, $options);
+                $pdo->exec("PRAGMA journal_mode = WAL;");
             } else {
                 throw $e;
             }
@@ -109,6 +124,7 @@ try {
                 user_name TEXT NOT NULL,
                 total_amount REAL NOT NULL DEFAULT 0.00,
                 status TEXT NOT NULL DEFAULT 'ชำระเงินแล้ว',
+                items_detail TEXT,
                 order_date TEXT NOT NULL
             );
         ");
@@ -143,9 +159,19 @@ try {
                 `user_name` VARCHAR(255) NOT NULL,
                 `total_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
                 `status` VARCHAR(50) NOT NULL DEFAULT 'ชำระเงินแล้ว',
+                `items_detail` TEXT,
                 `order_date` VARCHAR(50) NOT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
+    }
+
+    // Auto-migrate: Ensure items_detail column exists in orders table
+    try {
+        $pdo->query("SELECT items_detail FROM orders LIMIT 1");
+    } catch (\Exception $colEx) {
+        try {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN items_detail TEXT");
+        } catch (\Exception $ignored) {}
     }
 
     // 3. Ensure Default Users Exist
@@ -160,7 +186,28 @@ try {
         $userStmt->execute(['usr_demo', 'สมชาย ใจดี', 'user@caffebook.com', 'user123', 'customer']);
     }
 
-    // 4. Auto-seed 15 Books Catalog if empty or less than 10 books
+    // 4. Ensure Sample Orders Exist if empty
+    $orderCount = (int)$pdo->query("SELECT COUNT(*) FROM orders")->fetchColumn();
+    if ($orderCount === 0) {
+        $ordSql = (strtolower($dbDriver) === 'sqlite')
+            ? "INSERT OR IGNORE INTO orders (id, user_id, user_name, total_amount, status, items_detail, order_date) VALUES (?, ?, ?, ?, ?, ?, ?)"
+            : "INSERT IGNORE INTO orders (id, user_id, user_name, total_amount, status, items_detail, order_date) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        
+        $ordStmt = $pdo->prepare($ordSql);
+        
+        $sampleItems1 = json_encode([
+            ['id' => 'b_001', 'title' => 'กล้าที่จะถูกเกลียด', 'price' => 295.0, 'quantity' => 2]
+        ], JSON_UNESCAPED_UNICODE);
+        
+        $sampleItems2 = json_encode([
+            ['id' => 'b_6a9672e44c922', 'title' => 'THE LITTLE FROG’S GUIDE TO SELF-CARE', 'price' => 295.0, 'quantity' => 1]
+        ], JSON_UNESCAPED_UNICODE);
+
+        $ordStmt->execute(['ord_001', 'usr_demo', 'สมชาย ใจดี', 590.00, 'จัดส่งแล้ว', $sampleItems1, date('Y-m-d H:i', strtotime('-2 days'))]);
+        $ordStmt->execute(['ord_002', 'usr_demo', 'สมชาย ใจดี', 295.00, 'ชำระเงินแล้ว', $sampleItems2, date('Y-m-d H:i')]);
+    }
+
+    // 5. Auto-seed 15 Books Catalog if empty or less than 10 books
     $bookCount = (int)$pdo->query("SELECT COUNT(*) FROM books")->fetchColumn();
     if ($bookCount < 10) {
         $initialBooks = [
