@@ -496,13 +496,14 @@ function renderOrderItemsHtml($items_json) {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: var(--success-soft);
-            color: var(--success);
-            padding: 6px 14px;
+            background: #E8F8F0;
+            color: #27AE60;
+            padding: 7px 14px;
             border-radius: var(--radius-full);
             font-size: 0.82rem;
             font-weight: 600;
-            border: 1px solid rgba(39, 174, 96, 0.2);
+            border: 1px solid rgba(39, 174, 96, 0.25);
+            box-shadow: 0 2px 6px rgba(39, 174, 96, 0.08);
         }
 
         .status-badge .dot {
@@ -519,13 +520,14 @@ function renderOrderItemsHtml($items_json) {
             gap: 8px;
             background: #FDFBF7;
             color: var(--primary-dark);
-            padding: 6px 14px;
+            padding: 7px 16px;
             border-radius: var(--radius-full);
-            font-size: 0.82rem;
+            font-size: 0.84rem;
             font-weight: 600;
-            border: 1px solid var(--border-color);
+            border: 1.5px solid var(--border-color);
             text-decoration: none;
             transition: all 0.2s ease;
+            box-shadow: var(--shadow-xs);
         }
 
         .btn-nav-apk:hover {
@@ -533,12 +535,82 @@ function renderOrderItemsHtml($items_json) {
             border-color: var(--primary-light);
             color: var(--primary);
             transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
         }
 
-        @keyframes pulse {
-            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); }
-            70% { transform: scale(1); box-shadow: 0 0 0 7px rgba(39, 174, 96, 0); }
-            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
+        /* Modern User Profile Badge */
+        .user-profile-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 4px 6px 4px 5px;
+            background: #FAF7F2;
+            border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-full);
+            transition: all var(--transition-fast);
+            box-shadow: var(--shadow-xs);
+        }
+
+        .user-profile-badge:hover {
+            border-color: var(--primary-light);
+            background: white;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .user-avatar-circle {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.88rem;
+            box-shadow: 0 2px 6px rgba(111, 78, 55, 0.25);
+            flex-shrink: 0;
+        }
+
+        .user-info-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+            padding-right: 2px;
+        }
+
+        .user-name-title {
+            font-size: 0.86rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .user-role-tag {
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: var(--primary);
+            letter-spacing: 0.5px;
+        }
+
+        .btn-logout-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #FDEDEC;
+            color: var(--danger);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            margin-left: 2px;
+        }
+
+        .btn-logout-icon:hover {
+            background: var(--danger);
+            color: white;
+            transform: scale(1.08);
+            box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
         }
 
         /* Layout */
@@ -2017,27 +2089,29 @@ function renderOrderItemsHtml($items_json) {
     <header class="navbar">
         <a href="index.php" class="brand-logo">
             <div class="logo-icon"><i class="fa-solid fa-mug-hot"></i></div>
-            <span>Caffe<b>Book</b> Admin</span>
+            <span>Caffe<b>Book</b> <small style="font-size:0.72rem; font-weight:700; color:var(--primary); background:var(--primary-soft); padding:2px 8px; border-radius:10px; margin-left:4px; border:1px solid #EAE3D9; vertical-align:middle;">ADMIN</small></span>
         </a>
         <div class="nav-status">
-            <div class="status-badge">
+            <div class="status-badge" title="ระบบฐานข้อมูล TiDB Cloud / MySQL ออนไลน์">
                 <div class="dot"></div>
-                <span>Server & Database Online</span>
+                <span>Database Online</span>
             </div>
-            <button class="btn btn-sm" onclick="syncFullCatalog()" style="background: #FEF5E7; color: #E67E22; border: 1px solid #FADBD8; font-weight: 600;" title="กู้คืนและนำเข้าหนังสือทั้ง 15 เล่มจากฐานข้อมูลเดิม">
-                <i class="fa-solid fa-arrows-rotate"></i> ซิงค์หนังสือ 15 เล่ม
-            </button>
-            <a href="download_apk.php" class="btn-nav-apk">
+            <a href="download_apk.php" class="btn-nav-apk" title="ดาวน์โหลดไฟล์ติดตั้งสำหรับมือถือ Android">
                 <i class="fa-solid fa-mobile-screen-button"></i> โหลดแอป APK
             </a>
             <button class="btn btn-primary btn-sm" onclick="openAddBookModal()">
-                <i class="fa-solid fa-plus"></i> เพิ่มหนังสือ
+                <i class="fa-solid fa-plus"></i> เพิ่มหนังสือใหม่
             </button>
-            <div class="user-profile-badge" style="display: flex; align-items: center; gap: 8px; margin-left: 6px; padding: 4px 12px; background: #F5EBE6; border-radius: 20px; font-size: 0.85rem; color: #3E2723; font-weight: 600; border: 1px solid #EAE3D9;">
-                <i class="fa-solid fa-circle-user" style="color: #6F4E37; font-size: 1.15rem;"></i>
-                <span><?= htmlspecialchars($currentUser['name'] ?? 'Admin') ?></span>
-                <a href="index.php?action=logout" style="color: #E74C3C; text-decoration: none; margin-left: 4px; padding: 2px 6px; border-radius: 6px;" title="ออกจากระบบ">
-                    <i class="fa-solid fa-right-from-bracket"></i>
+            <div class="user-profile-badge">
+                <div class="user-avatar-circle">
+                    <i class="fa-solid fa-user-tie"></i>
+                </div>
+                <div class="user-info-text">
+                    <span class="user-name-title"><?= htmlspecialchars($currentUser['name'] ?? 'Admin') ?></span>
+                    <span class="user-role-tag"><?= htmlspecialchars(strtoupper($currentUser['role'] ?? 'ADMIN')) ?></span>
+                </div>
+                <a href="index.php?action=logout" class="btn-logout-icon" title="ออกจากระบบ">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
                 </a>
             </div>
         </div>
