@@ -569,25 +569,111 @@ function renderOrderStatusBadge($status) {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: #FDFBF7;
+            background: linear-gradient(135deg, #FDFBF7, #F5EBE6);
             color: var(--primary-dark);
-            padding: 7px 16px;
+            padding: 6px 14px;
             border-radius: var(--radius-full);
             font-size: 0.84rem;
             font-weight: 600;
-            border: 1.5px solid var(--border-color);
+            border: 1.5px solid #D0C5B8;
             text-decoration: none;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow-xs);
+            cursor: pointer;
+        }
+
+        .btn-nav-apk:hover {
+            background: linear-gradient(135deg, #6F4E37, #5A3D28);
+            border-color: #5A3D28;
+            color: #FFFFFF;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(111, 78, 55, 0.25);
+        }
+
+        .btn-nav-apk:hover .apk-size-pill {
+            background: rgba(255, 255, 255, 0.25);
+            color: #FFFFFF;
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .apk-size-pill {
+            font-size: 0.7rem;
+            font-weight: 700;
+            background: var(--primary-soft);
+            color: var(--primary);
+            padding: 2px 7px;
+            border-radius: 10px;
+            border: 1px solid rgba(111, 78, 55, 0.15);
+            letter-spacing: 0.2px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-nav-apk-qr {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #FDFBF7;
+            border: 1.5px solid var(--border-color);
+            color: var(--primary-dark);
+            cursor: pointer;
             transition: all 0.2s ease;
             box-shadow: var(--shadow-xs);
         }
 
-        .btn-nav-apk:hover {
+        .btn-nav-apk-qr:hover {
             background: var(--primary-soft);
-            border-color: var(--primary-light);
             color: var(--primary);
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-sm);
+            border-color: var(--primary-light);
+            transform: scale(1.06);
         }
+
+        /* APK Hub Modal Styles */
+        .apk-hub-grid {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 20px;
+            align-items: center;
+        }
+        @media (max-width: 600px) {
+            .apk-hub-grid {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+        }
+        .qr-card-container {
+            background: #FAF8F5;
+            border: 1.5px solid var(--border-color);
+            border-radius: 14px;
+            padding: 14px;
+            text-align: center;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.02);
+        }
+        .qr-image-frame {
+            background: white;
+            padding: 8px;
+            border-radius: 10px;
+            display: inline-block;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            border: 1px solid #EAE3D9;
+        }
+        .apk-meta-badge-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin: 12px 0;
+        }
+        .apk-meta-card {
+            background: #FAF8F5;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 0.82rem;
+        }
+        .apk-meta-card .lbl { color: var(--text-muted); font-size: 0.72rem; margin-bottom: 2px; }
+        .apk-meta-card .val { font-weight: 700; color: var(--primary-dark); }
 
         /* Modern User Profile Badge */
         .user-profile-badge {
@@ -2480,9 +2566,16 @@ function renderOrderStatusBadge($status) {
                 <div class="dot"></div>
                 <span>Database Online</span>
             </div>
-            <a href="download_apk.php" class="btn-nav-apk" title="ดาวน์โหลดไฟล์ติดตั้งสำหรับมือถือ Android">
-                <i class="fa-solid fa-mobile-screen-button"></i> โหลดแอป APK
-            </a>
+            <div class="apk-download-btn-group" style="display:flex; align-items:center; gap:6px;">
+                <a href="download_apk.php" onclick="downloadApkDirect(event)" class="btn-nav-apk" title="ดาวน์โหลดไฟล์ติดตั้ง Android APK อัตโนมัติ (CaffeBook.apk)">
+                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                    <span>โหลดแอป APK</span>
+                    <span class="apk-size-pill" id="navApkSizePill">21.6 MB</span>
+                </a>
+                <button type="button" class="btn-nav-apk-qr" onclick="openApkHubModal()" title="เปิด QR Code สแกนโหลดผ่านมือถือ Android">
+                    <i class="fa-solid fa-qrcode"></i>
+                </button>
+            </div>
             <button class="btn btn-primary btn-sm" onclick="openAddBookModal()">
                 <i class="fa-solid fa-plus"></i> เพิ่มหนังสือใหม่
             </button>
@@ -2533,11 +2626,16 @@ function renderOrderStatusBadge($status) {
 
             <div class="api-info-card">
                 <h4><i class="fa-solid fa-mobile-screen"></i> ทดสอบบนมือถือ</h4>
-                <p>เปิด URL นี้ในเบราว์เซอร์มือถือ:</p>
+                <p>สแกนหรือดาวน์โหลดแอป Android ทันที:</p>
                 <code>http://<?= htmlspecialchars($_SERVER['HTTP_HOST'] ?? '127.0.0.1:8000') ?></code>
-                <a href="download_apk.php" style="display:inline-flex;align-items:center;gap:6px;margin-top:10px;color:var(--primary);font-weight:600;text-decoration:none;font-size:0.84rem;">
-                    <i class="fa-solid fa-download"></i> โหลดไฟล์ APK ทันที
-                </a>
+                <div style="display:flex; flex-direction:column; gap:6px; margin-top:10px;">
+                    <a href="download_apk.php" onclick="downloadApkDirect(event)" class="btn btn-primary btn-sm" style="font-size:0.8rem; justify-content:center; text-decoration:none; padding:7px 12px;">
+                        <i class="fa-solid fa-cloud-arrow-down"></i> โหลดไฟล์ APK ทันที
+                    </a>
+                    <button type="button" onclick="openApkHubModal()" class="btn btn-secondary btn-sm" style="font-size:0.8rem; justify-content:center; padding:7px 12px; background:white;">
+                        <i class="fa-solid fa-qrcode"></i> สแกน QR Code มือถือ
+                    </button>
+                </div>
             </div>
         </aside>
 
@@ -3219,10 +3317,13 @@ function renderOrderStatusBadge($status) {
                             <i class="fa-solid fa-network-wired"></i> 
                             <span>ข้อมูลการเชื่อมต่อและสถาปัตยกรรมระบบ (System Architecture & REST API)</span>
                         </h2>
-                        <div class="card-actions">
-                            <a href="download_apk.php" class="btn btn-secondary btn-sm">
-                                <i class="fa-solid fa-mobile-screen-button"></i> โหลดแอป APK มือถือ
+                        <div class="card-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <a href="download_apk.php" onclick="downloadApkDirect(event)" class="btn btn-primary btn-sm">
+                                <i class="fa-solid fa-cloud-arrow-down"></i> โหลดแอป APK ทันที (Auto Download)
                             </a>
+                            <button type="button" onclick="openApkHubModal()" class="btn btn-secondary btn-sm">
+                                <i class="fa-solid fa-qrcode"></i> QR Code & ข้อมูล APK มือถือ
+                            </button>
                         </div>
                     </div>
 
@@ -3695,6 +3796,86 @@ function renderOrderStatusBadge($status) {
                         </button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: APK DOWNLOAD & MOBILE HUB -->
+    <div id="apkHubModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 580px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-mobile-screen-button"></i> ศูนย์ดาวน์โหลดแอปมือถือ (Android APK)</h3>
+                <button class="modal-close" onclick="closeApkHubModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 1.4rem;">
+                <div class="apk-hub-grid">
+                    <!-- Left: QR Code -->
+                    <div class="qr-card-container">
+                        <div class="qr-image-frame">
+                            <img id="apkQrCodeImg" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=http://<?= htmlspecialchars($_SERVER['HTTP_HOST'] ?? '127.0.0.1:8000') ?>/download_apk.php" alt="APK QR Code" style="width:145px; height:145px; display:block; border-radius:6px;">
+                        </div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:8px; font-weight:600;">
+                            <i class="fa-solid fa-camera"></i> สแกนด้วยกล้องมือถือ
+                        </div>
+                    </div>
+
+                    <!-- Right: Details & Action Buttons -->
+                    <div>
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                            <span class="badge badge-success" style="font-size:0.78rem;">
+                                <i class="fa-solid fa-circle-check"></i> พร้อมดาวน์โหลด
+                            </span>
+                            <span style="font-size:0.8rem; color:var(--text-muted);" id="apkLastUpdated">อัปเดตล่าสุด: พร้อมใช้งาน</span>
+                        </div>
+                        <h4 style="font-size:1.15rem; color:var(--primary-dark); margin-bottom:4px; font-weight:700;">CaffeBook Mobile App</h4>
+                        <p style="font-size:0.84rem; color:var(--text-muted); line-height:1.5;">
+                            แอปพลิเคชันสำหรับสั่งซื้อหนังสือและเครื่องดื่ม ใช้งานได้บนมือถือ Android
+                        </p>
+
+                        <div class="apk-meta-badge-grid">
+                            <div class="apk-meta-card">
+                                <div class="lbl">ขนาดไฟล์ (Size)</div>
+                                <div class="val" id="apkModalSizeVal">21.6 MB</div>
+                            </div>
+                            <div class="apk-meta-card">
+                                <div class="lbl">ระบบปฏิบัติการ</div>
+                                <div class="val">Android 8.0+</div>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">
+                            <a href="download_apk.php" onclick="downloadApkDirect(event)" class="btn btn-primary" style="justify-content:center; text-decoration:none; font-size:0.88rem; padding:9px;">
+                                <i class="fa-solid fa-cloud-arrow-down"></i> ดาวน์โหลด APK ทันที (Auto Download)
+                            </a>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" class="btn btn-outline" style="flex:1; justify-content:center; font-size:0.8rem; padding:7px;" onclick="copyApkDownloadLink()">
+                                    <i class="fa-solid fa-copy"></i> คัดลอกลิงก์
+                                </button>
+                                <button type="button" class="btn btn-outline" style="flex:1; justify-content:center; font-size:0.8rem; padding:7px;" onclick="syncApkFromServer()">
+                                    <i class="fa-solid fa-arrows-rotate"></i> ซิงค์ไฟล์
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step Guide for Android Installation -->
+                <div style="margin-top:16px; background:#FAF8F5; border-radius:12px; padding:12px 16px; border:1px solid var(--border-color); font-size:0.82rem; color:var(--text-main);">
+                    <div style="font-weight:700; color:var(--primary-dark); margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                        <i class="fa-brands fa-android" style="color:#27AE60;"></i> วิธีติดตั้งบนมือถือ Android:
+                    </div>
+                    <ol style="margin-left:20px; line-height:1.6; color:#554A43;">
+                        <li>เมื่อโหลดไฟล์ <b>CaffeBook.apk</b> เสร็จ ให้แตะที่ไฟล์เพื่อเปิดติดตั้ง</li>
+                        <li>หากมีข้อความเตือน ให้กด <b>"อนุญาตให้ติดตั้งแอปจากแหล่งที่ไม่รู้จัก"</b></li>
+                        <li>กด <b>"ติดตั้ง" (Install)</b> และเปิดใช้งานได้ทันที</li>
+                    </ol>
+                </div>
+            </div>
+            <div class="modal-footer" style="justify-content: space-between;">
+                <span style="font-size:0.75rem; color:var(--text-muted);">
+                    <i class="fa-solid fa-shield-halved"></i> ไฟล์ผ่านการ Build โดยตรงจาก Flutter SDK
+                </span>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="closeApkHubModal()">ปิดหน้าต่าง</button>
             </div>
         </div>
     </div>
@@ -5369,6 +5550,113 @@ function renderOrderStatusBadge($status) {
                         });
                 }
             });
+        }
+
+        // --- APK AUTO DOWNLOAD & HUB SCRIPTS ---
+        function downloadApkDirect(e) {
+            if (e) e.preventDefault();
+            
+            // Show sleek feedback Toast
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 4000,
+                timerProgressBar: true,
+                didOpen: (toast) => {
+                    toast.addEventListener('mouseenter', Swal.stopTimer);
+                    toast.addEventListener('mouseleave', Swal.resumeTimer);
+                }
+            });
+
+            Toast.fire({
+                icon: 'success',
+                title: '🚀 กำลังเริ่มดาวน์โหลด CaffeBook.apk',
+                html: '<span style="font-size:0.84rem; color:#7A726D;">ไฟล์ติดตั้ง APK ขนาด ~21.6 MB กำลังดาวน์โหลดลงในเครื่องของคุณอัตโนมัติ...</span>'
+            });
+
+            // Trigger silent automatic download
+            const tempLink = document.createElement('a');
+            tempLink.href = 'download_apk.php?auto=1&t=' + Date.now();
+            tempLink.setAttribute('download', 'CaffeBook.apk');
+            tempLink.style.display = 'none';
+            document.body.appendChild(tempLink);
+            tempLink.click();
+            setTimeout(() => {
+                document.body.removeChild(tempLink);
+            }, 1000);
+        }
+
+        function openApkHubModal() {
+            // Update QR code with current location
+            const baseUrl = window.location.origin + window.location.pathname.replace('index.php', '') + 'download_apk.php';
+            const qrImg = document.getElementById('apkQrCodeImg');
+            if (qrImg) {
+                qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(baseUrl)}`;
+            }
+
+            // Fetch latest APK file info
+            fetch('download_apk.php?action=check')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.exists) {
+                        const sizePill = document.getElementById('navApkSizePill');
+                        const modalSize = document.getElementById('apkModalSizeVal');
+                        const updatedEl = document.getElementById('apkLastUpdated');
+                        if (sizePill && data.size_formatted) sizePill.innerText = data.size_formatted;
+                        if (modalSize && data.size_formatted) modalSize.innerText = data.size_formatted;
+                        if (updatedEl && data.updated_thai) updatedEl.innerText = 'อัปเดตล่าสุด: ' + data.updated_thai;
+                    }
+                })
+                .catch(() => {});
+
+            document.getElementById('apkHubModal').classList.add('active');
+        }
+
+        function closeApkHubModal() {
+            document.getElementById('apkHubModal').classList.remove('active');
+        }
+
+        function copyApkDownloadLink() {
+            const downloadUrl = window.location.origin + window.location.pathname.replace('index.php', '') + 'download_apk.php';
+            navigator.clipboard.writeText(downloadUrl).then(() => {
+                Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'success',
+                    title: 'คัดลอกลิงก์ดาวน์โหลดแล้ว!',
+                    text: downloadUrl,
+                    showConfirmButton: false,
+                    timer: 3000
+                });
+            }).catch(() => {
+                prompt('คัดลอกลิงก์ดาวน์โหลด APK:', downloadUrl);
+            });
+        }
+
+        async function syncApkFromServer() {
+            Swal.fire({
+                title: 'กำลังซิงค์ไฟล์ APK...',
+                text: 'กำลังตรวจสอบไฟล์ที่สร้างล่าสุดจากโฟลเดอร์ build',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            try {
+                const res = await fetch('download_apk.php?action=sync');
+                const data = await res.json();
+                if (data.status === 'success') {
+                    Swal.fire('สำเร็จ', data.message, 'success');
+                    const sizePill = document.getElementById('navApkSizePill');
+                    const modalSize = document.getElementById('apkModalSizeVal');
+                    if (sizePill && data.size_formatted) sizePill.innerText = data.size_formatted;
+                    if (modalSize && data.size_formatted) modalSize.innerText = data.size_formatted;
+                } else {
+                    Swal.fire('แจ้งเตือน', data.message, 'info');
+                }
+            } catch (err) {
+                Swal.fire('ข้อผิดพลาด', err.message, 'error');
+            }
         }
     </script>
 </body>
