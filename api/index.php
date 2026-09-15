@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . '/db.php';
 header("Content-Type: text/html; charset=UTF-8");
 
@@ -13,7 +15,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
 
 // Handle Login POST
 $login_error = '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login_email'])) {
+$request_method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+if ($request_method === 'POST' && isset($_POST['login_email'])) {
     $email = trim($_POST['login_email'] ?? '');
     $password = trim($_POST['login_password'] ?? '');
 
@@ -337,6 +340,9 @@ $users = $pdo->query("SELECT id, name, email, role, created_at FROM users ORDER 
 
 // Category counts for dynamic filter chips
 $category_counts_raw = $pdo->query("SELECT category, COUNT(*) as cnt FROM books GROUP BY category")->fetchAll(PDO::FETCH_KEY_PAIR);
+$default_categories = ['ทั้งหมด', 'นิยาย', 'พัฒนาตนเอง', 'ธุรกิจ/บริหาร', 'วรรณกรรม', 'การ์ตูน/มังงะ'];
+$db_categories = $pdo->query("SELECT DISTINCT category FROM books WHERE category IS NOT NULL AND category != ''")->fetchAll(PDO::FETCH_COLUMN);
+$categories = array_values(array_unique(array_merge($default_categories, $db_categories)));
 // Order breakdown stats
 $orders_pending = 0;
 $orders_paid = 0;
@@ -2528,7 +2534,7 @@ function renderOrderStatusBadge($status) {
             <div class="api-info-card">
                 <h4><i class="fa-solid fa-mobile-screen"></i> ทดสอบบนมือถือ</h4>
                 <p>เปิด URL นี้ในเบราว์เซอร์มือถือ:</p>
-                <code>http://<?= $_SERVER['HTTP_HOST'] ?></code>
+                <code>http://<?= htmlspecialchars($_SERVER['HTTP_HOST'] ?? '127.0.0.1:8000') ?></code>
                 <a href="download_apk.php" style="display:inline-flex;align-items:center;gap:6px;margin-top:10px;color:var(--primary);font-weight:600;text-decoration:none;font-size:0.84rem;">
                     <i class="fa-solid fa-download"></i> โหลดไฟล์ APK ทันที
                 </a>
@@ -2648,59 +2654,7 @@ function renderOrderStatusBadge($status) {
                         </div>
                     </div>
 
-                    <!-- Quick-Add Product Bar (⚡ เพิ่มสินค้าด่วนใน 1 บรรทัด) -->
-                    <div class="quick-add-panel">
-                        <div class="quick-add-header">
-                            <div class="quick-add-title">
-                                <i class="fa-solid fa-bolt" style="color:var(--accent);"></i>
-                                <span>เพิ่มรายการสินค้าใหม่ด่วน (Quick Product Adder)</span>
-                            </div>
-                            <div style="display:flex; gap:8px;">
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="quickAddSampleBook()" title="เพิ่มสินค้าตัวอย่างยอดนิยมอัตโนมัติ">
-                                    <i class="fa-solid fa-wand-magic-sparkles"></i> สุ่มสินค้าตัวอย่าง
-                                </button>
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="openAddBookModal()">
-                                    <i class="fa-solid fa-expand"></i> ฟอร์มเต็มรูปแบบ
-                                </button>
-                            </div>
-                        </div>
-                        <form id="quickAddBookForm" onsubmit="handleQuickAddBook(event)" class="quick-add-form">
-                            <div style="flex: 2; min-width: 180px;">
-                                <input type="text" id="quickTitle" name="title" class="form-control" placeholder="ชื่อหนังสือ *" required autocomplete="off">
-                            </div>
-                            <div style="flex: 1.4; min-width: 130px;">
-                                <input type="text" id="quickAuthor" name="author" class="form-control" placeholder="ผู้แต่ง / สนพ. *" required autocomplete="off">
-                            </div>
-                            <div style="flex: 1.2; min-width: 120px;">
-                                <select id="quickCategory" name="category" class="form-control">
-                                    <?php foreach ($categories as $cat): ?>
-                                        <?php if ($cat !== 'ทั้งหมด'): ?>
-                                            <option value="<?= htmlspecialchars($cat) ?>"><?= htmlspecialchars($cat) ?></option>
-                                        <?php endif; ?>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div style="flex: 0.9; min-width: 85px;">
-                                <input type="number" step="0.01" min="1" id="quickPrice" name="price" class="form-control" placeholder="ราคา ฿ *" required>
-                            </div>
-                            <div style="flex: 0.8; min-width: 75px;">
-                                <input type="number" min="0" id="quickStock" name="stock" class="form-control" placeholder="สต็อก" value="20" required>
-                            </div>
-                            <div style="flex: 1.4; min-width: 150px;">
-                                <select id="quickPresetCover" name="cover_url" class="form-control">
-                                    <option value="https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500">🎨 ปกพัฒนาตนเอง</option>
-                                    <option value="https://images.unsplash.com/photo-1592496431122-2349e0fbc666?w=500">💼 ปกธุรกิจ & การเงิน</option>
-                                    <option value="https://images.unsplash.com/photo-1512820790803-83ca734da794?w=500">📚 ปกนิยาย & เรื่องสั้น</option>
-                                    <option value="https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=500">✨ ปกวรรณกรรมคลาสสิก</option>
-                                    <option value="https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500">⚔️ ปกการ์ตูน / มังงะ</option>
-                                    <option value="https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=500">☕ ปกคาเฟ่ & ชีวิตชีวา</option>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-primary" style="white-space: nowrap; padding: 8px 16px;">
-                                <i class="fa-solid fa-plus"></i> เพิ่มทันที
-                            </button>
-                        </form>
-                    </div>
+
 
                     <!-- Quick KPI Mini-Bar for Books -->
                     <div class="book-kpi-bar">
