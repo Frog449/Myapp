@@ -1,12 +1,14 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../constants/brand_assets.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/book_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../theme/cafe_theme.dart';
 import '../auth/auth_dialogs.dart';
 import '../frontoffice/my_orders_dialog.dart';
+import '../checkout/checkout_dialog.dart';
 
 class AppHeader extends StatefulWidget implements PreferredSizeWidget {
   const AppHeader({super.key});
@@ -35,7 +37,7 @@ class _AppHeaderState extends State<AppHeader> {
     final cart = Provider.of<CartProvider>(context);
     final bookProvider = Provider.of<BookProvider>(context, listen: false);
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < 768;
+    final isMobile = screenWidth < 900;
 
     return Container(
       decoration: BoxDecoration(
@@ -68,25 +70,10 @@ class _AppHeaderState extends State<AppHeader> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
+                        BrandAssets.buildLogoImage(
                           width: 38,
                           height: 38,
-                          decoration: BoxDecoration(
-                            gradient: CafeTheme.goldGradient,
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.25),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.local_cafe_rounded,
-                            color: Colors.white,
-                            size: 22,
-                          ),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         const SizedBox(width: 10),
                         RichText(
@@ -528,15 +515,6 @@ class _CartDialogContent extends StatefulWidget {
 }
 
 class _CartDialogContentState extends State<_CartDialogContent> {
-  bool _isCheckingOut = false;
-  final TextEditingController _guestNameController = TextEditingController();
-
-  @override
-  void dispose() {
-    _guestNameController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<CartProvider>(context);
@@ -840,67 +818,36 @@ class _CartDialogContentState extends State<_CartDialogContent> {
                 child: const Text('ล้างตะกร้า', style: TextStyle(color: CafeTheme.dangerRed, fontSize: 13)),
               ),
               ElevatedButton.icon(
-                onPressed: _isCheckingOut
-                    ? null
-                    : () async {
-                        final nav = Navigator.of(context);
-                        final parentCtx = widget.parentContext;
-                        final messenger = ScaffoldMessenger.of(parentCtx);
+                onPressed: () {
+                  final nav = Navigator.of(context);
+                  final parentCtx = widget.parentContext;
+                  final messenger = ScaffoldMessenger.of(parentCtx);
 
-                        // Enforce login before checkout
-                        if (!auth.isLoggedIn) {
-                          nav.pop();
-                          if (parentCtx.mounted) {
-                            AuthDialogs.showLoginDialog(parentCtx);
-                            messenger.showSnackBar(
-                              const SnackBar(
-                                content: Text('กรุณาเข้าสู่ระบบก่อนทำการยืนยันสั่งซื้อหนังสือ'),
-                                backgroundColor: CafeTheme.espresso,
-                                duration: Duration(seconds: 3),
-                              ),
-                            );
-                          }
-                          return;
-                        }
+                  // Enforce login before checkout
+                  if (!auth.isLoggedIn) {
+                    nav.pop();
+                    if (parentCtx.mounted) {
+                      AuthDialogs.showLoginDialog(parentCtx);
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text('กรุณาเข้าสู่ระบบก่อนทำการยืนยันสั่งซื้อหนังสือ'),
+                          backgroundColor: CafeTheme.espresso,
+                          duration: Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                    return;
+                  }
 
-                        setState(() => _isCheckingOut = true);
-                        try {
-                          final userId = auth.currentUser!.id;
-                          final userName = auth.currentUser!.name;
-
-                          final ok = await cart.checkout(userId, userName);
-                          if (ok) {
-                            nav.pop();
-                            messenger.showSnackBar(
-                              const SnackBar(
-                                content: Text('🎉 สั่งซื้อหนังสือสำเร็จเรียบร้อยแล้ว ขอบคุณที่ใช้บริการ CaffeBook!'),
-                                backgroundColor: CafeTheme.successGreen,
-                                duration: Duration(seconds: 4),
-                              ),
-                            );
-                            // Open order history dialog to confirm
-                            if (parentCtx.mounted) {
-                              MyOrdersDialog.show(parentCtx);
-                            }
-                          } else {
-                            messenger.showSnackBar(
-                              const SnackBar(
-                                content: Text('เกิดข้อผิดพลาดในการทำรายการ กรุณาลองใหม่อีกครั้ง'),
-                                backgroundColor: CafeTheme.dangerRed,
-                              ),
-                            );
-                          }
-                        } finally {
-                          if (mounted) setState(() => _isCheckingOut = false);
-                        }
-                      },
-                icon: _isCheckingOut
-                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Icon(!auth.isLoggedIn ? Icons.lock_outline_rounded : Icons.check_circle_outline_rounded, size: 16),
+                  // Close cart dialog and open interactive multi-payment Checkout Dialog
+                  nav.pop();
+                  if (parentCtx.mounted) {
+                    CheckoutDialog.show(parentCtx);
+                  }
+                },
+                icon: Icon(!auth.isLoggedIn ? Icons.lock_outline_rounded : Icons.payment_rounded, size: 16),
                 label: Text(
-                  _isCheckingOut
-                      ? 'กำลังดำเนินการ...'
-                      : (!auth.isLoggedIn ? 'เข้าสู่ระบบเพื่อสั่งซื้อ' : 'ยืนยันการสั่งซื้อ'),
+                  !auth.isLoggedIn ? 'เข้าสู่ระบบเพื่อสั่งซื้อ' : 'ดำเนินการชำระเงิน',
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: !auth.isLoggedIn ? CafeTheme.espresso : CafeTheme.warmAmber,

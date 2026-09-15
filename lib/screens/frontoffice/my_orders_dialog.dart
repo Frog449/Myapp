@@ -235,11 +235,17 @@ class _MyOrdersDialogState extends State<MyOrdersDialog> {
     int stepProgress;
 
     switch (order.status) {
+      case 'รอเก็บเงินปลายทาง':
+        statusColor = const Color(0xFFE65100);
+        statusIcon = Icons.local_shipping_outlined;
+        stepProgress = 1;
+        break;
       case 'กำลังจัดส่ง':
         statusColor = Colors.orange.shade700;
         statusIcon = Icons.local_shipping_rounded;
         stepProgress = 2;
         break;
+      case 'จัดส่งแล้ว':
       case 'สำเร็จ':
         statusColor = CafeTheme.successGreen;
         statusIcon = Icons.check_circle_rounded;
@@ -257,6 +263,23 @@ class _MyOrdersDialogState extends State<MyOrdersDialog> {
         stepProgress = 1;
         break;
     }
+
+    // Payment Method Badge Config
+    IconData payIcon = Icons.qr_code_2_rounded;
+    Color payColor = const Color(0xFF003D6B);
+    Color payBg = const Color(0xFFEBF5FB);
+
+    if (order.paymentMethod.contains('บัตร') || order.paymentMethod.contains('Card')) {
+      payIcon = Icons.credit_card_rounded;
+      payColor = const Color(0xFF8E24AA);
+      payBg = const Color(0xFFF3E5F5);
+    } else if (order.paymentMethod.contains('ปลายทาง') || order.paymentMethod.contains('COD')) {
+      payIcon = Icons.local_shipping_rounded;
+      payColor = const Color(0xFFE65100);
+      payBg = const Color(0xFFFFF3E0);
+    }
+
+    final isCod = order.paymentMethod.contains('ปลายทาง') || order.paymentMethod.contains('COD');
 
     return Container(
       decoration: BoxDecoration(
@@ -312,26 +335,43 @@ class _MyOrdersDialogState extends State<MyOrdersDialog> {
             ],
           ),
           const SizedBox(height: 10),
+
+          // Payment Method & Order Time Row
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Expanded(
+              // Payment Method Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: payBg,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: payColor.withOpacity(0.3)),
+                ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.access_time_rounded, size: 13, color: Colors.grey),
+                    Icon(payIcon, size: 12, color: payColor),
                     const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        'เวลาสั่งซื้อ: ${order.orderDate} น. (${order.userName})',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11, color: CafeTheme.textMuted),
+                    Text(
+                      order.paymentMethod,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: payColor,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'สั่งเมื่อ: ${order.orderDate} น.',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, color: CafeTheme.textMuted),
+                ),
+              ),
               Text(
                 '฿${order.totalAmount.toStringAsFixed(2)}',
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: CafeTheme.warmAmber),
@@ -395,11 +435,11 @@ class _MyOrdersDialogState extends State<MyOrdersDialog> {
               ),
               child: Row(
                 children: [
-                  _buildTimelineStep(1, 'ชำระแล้ว', stepProgress >= 1),
+                  _buildTimelineStep(1, isCod ? 'รับออเดอร์ (COD)' : 'ชำระแล้ว', stepProgress >= 1),
                   _buildTimelineLine(stepProgress >= 2),
                   _buildTimelineStep(2, 'กำลังจัดส่ง', stepProgress >= 2),
                   _buildTimelineLine(stepProgress >= 3),
-                  _buildTimelineStep(3, 'สำเร็จแล้ว', stepProgress >= 3),
+                  _buildTimelineStep(3, isCod ? 'ชำระ & รับของ' : 'จัดส่งสำเร็จ', stepProgress >= 3),
                 ],
               ),
             ),

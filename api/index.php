@@ -244,7 +244,9 @@ if (!isset($_SESSION['admin_user'])) {
 <body>
     <div class="login-card">
         <div class="login-header">
-            <div class="login-logo"><i class="fa-solid fa-mug-hot"></i></div>
+            <div class="login-logo" style="background:transparent; box-shadow:none; width:72px; height:72px;">
+                <img src="assets/logo.png" alt="CaffeBook Logo" style="width:100%; height:100%; object-fit:cover; border-radius:18px; box-shadow:0 8px 20px rgba(111, 78, 55, 0.25);">
+            </div>
             <h1 class="login-title">Caffe<b>Book</b> Admin</h1>
             <p class="login-subtitle">ระบบจัดการสต็อกหนังสือและคำสั่งซื้อหลังบ้าน</p>
         </div>
@@ -335,9 +337,23 @@ $users = $pdo->query("SELECT id, name, email, role, created_at FROM users ORDER 
 
 // Category counts for dynamic filter chips
 $category_counts_raw = $pdo->query("SELECT category, COUNT(*) as cnt FROM books GROUP BY category")->fetchAll(PDO::FETCH_KEY_PAIR);
-$categories = ['ทั้งหมด', 'นิยาย', 'พัฒนาตนเอง', 'ธุรกิจ/บริหาร', 'วรรณกรรม', 'การ์ตูน/มังงะ'];
+// Order breakdown stats
+$orders_pending = 0;
+$orders_paid = 0;
+$orders_shipping = 0;
+$orders_delivered = 0;
+$orders_cancelled = 0;
 
-function renderOrderItemsHtml($items_json) {
+foreach ($orders as $ord) {
+    $st = $ord['status'] ?? '';
+    if ($st === 'รอชำระเงิน' || $st === 'รอเก็บเงินปลายทาง') $orders_pending++;
+    else if ($st === 'ชำระเงินแล้ว') $orders_paid++;
+    else if ($st === 'กำลังจัดส่ง') $orders_shipping++;
+    else if ($st === 'จัดส่งแล้ว') $orders_delivered++;
+    else if ($st === 'ยกเลิก') $orders_cancelled++;
+}
+
+function renderOrderItemsHtml($items_json, $orderId = '') {
     if (empty($items_json)) {
         return '<span style="color:var(--text-muted); font-size:0.82rem;">(ไม่มีรายละเอียดรายการ)</span>';
     }
@@ -351,8 +367,9 @@ function renderOrderItemsHtml($items_json) {
         $qty = intval($it['quantity'] ?? 1);
         $price = floatval($it['price'] ?? 0);
         $subtotal = $qty * $price;
-        $html .= '<div class="order-item-pill" title="' . $title . '">';
-        $html .= '<i class="fa-solid fa-book"></i>';
+        $clickAction = $orderId ? 'onclick="openOrderReceiptModal(\'' . $orderId . '\')"' : '';
+        $html .= '<div class="order-item-pill" title="' . $title . ' (คลิกเพื่อดูใบเสร็จ)" ' . $clickAction . '>';
+        $html .= '<i class="fa-solid fa-book" style="color:var(--primary-light);"></i>';
         $html .= '<span class="item-title">' . $title . '</span>';
         $html .= '<span class="item-qty">×' . $qty . '</span>';
         if ($price > 0) {
@@ -362,6 +379,34 @@ function renderOrderItemsHtml($items_json) {
     }
     $html .= '</div>';
     return $html;
+}
+
+function renderPaymentBadge($method) {
+    $method = $method ?: 'สแกน QR Code';
+    if (strpos($method, 'สแกน') !== false || strpos($method, 'PromptPay') !== false) {
+        return '<span class="badge" style="background:#EBF5FB; color:#2980B9; border:1px solid rgba(41,128,185,0.2);"><i class="fa-solid fa-qrcode"></i> ' . htmlspecialchars($method) . '</span>';
+    } else if (strpos($method, 'บัตร') !== false || strpos($method, 'Card') !== false) {
+        return '<span class="badge" style="background:#F3E5F5; color:#8E24AA; border:1px solid rgba(142,36,170,0.2);"><i class="fa-solid fa-credit-card"></i> ' . htmlspecialchars($method) . '</span>';
+    } else if (strpos($method, 'ปลายทาง') !== false || strpos($method, 'COD') !== false) {
+        return '<span class="badge" style="background:#FFF3E0; color:#E65100; border:1px solid rgba(230,81,0,0.2);"><i class="fa-solid fa-truck-ramp-box"></i> ' . htmlspecialchars($method) . '</span>';
+    }
+    return '<span class="badge badge-info">' . htmlspecialchars($method) . '</span>';
+}
+
+function renderOrderStatusBadge($status) {
+    $status = $status ?: 'รอชำระเงิน';
+    if ($status === 'จัดส่งแล้ว') {
+        return '<span class="badge badge-success"><i class="fa-solid fa-box-open"></i> จัดส่งแล้ว</span>';
+    } else if ($status === 'กำลังจัดส่ง') {
+        return '<span class="badge badge-shipping"><i class="fa-solid fa-truck-fast"></i> กำลังจัดส่ง</span>';
+    } else if ($status === 'ชำระเงินแล้ว') {
+        return '<span class="badge badge-info"><i class="fa-solid fa-circle-check"></i> ชำระเงินแล้ว</span>';
+    } else if ($status === 'ยกเลิก') {
+        return '<span class="badge badge-danger"><i class="fa-solid fa-ban"></i> ยกเลิก</span>';
+    } else if ($status === 'รอเก็บเงินปลายทาง') {
+        return '<span class="badge badge-warning"><i class="fa-solid fa-hand-holding-dollar"></i> รอเก็บเงินปลายทาง</span>';
+    }
+    return '<span class="badge badge-warning"><i class="fa-solid fa-clock"></i> รอชำระเงิน</span>';
 }
 ?>
 <!DOCTYPE html>
@@ -1304,38 +1349,209 @@ function renderOrderItemsHtml($items_json) {
             color: var(--text-light);
         }
 
+        /* Quick Add Top Strip */
+        .quick-add-panel {
+            background: linear-gradient(135deg, #FFFDFB 0%, #FAF5EE 100%);
+            border: 1.5px solid #EAD8C7;
+            border-radius: var(--radius-md);
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.2rem;
+            box-shadow: 0 4px 14px rgba(111, 78, 55, 0.06);
+            transition: all var(--transition-fast);
+        }
+
+        .quick-add-panel:hover {
+            border-color: var(--primary-light);
+            box-shadow: 0 6px 20px rgba(111, 78, 55, 0.1);
+        }
+
+        .quick-add-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.85rem;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .quick-add-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quick-add-form {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .quick-add-form .form-control {
+            padding: 8px 12px;
+            font-size: 0.86rem;
+            border-radius: 8px;
+            border: 1.5px solid var(--border-color);
+            background: white;
+        }
+
+        .quick-add-form .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(111, 78, 55, 0.12);
+        }
+
+        /* Inline Fast Category Dropdown in Table Row */
+        .row-cat-select {
+            padding: 4px 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            border-radius: 6px;
+            border: 1px solid #EADBCE;
+            background: #F8F3EC;
+            color: #6F4E37;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .row-cat-select:hover, .row-cat-select:focus {
+            background: white;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(111, 78, 55, 0.15);
+        }
+
+        /* Quick Interactive Price Pill */
+        .quick-price-wrap {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: #FAF7F2;
+            border: 1px dashed #D6C7B2;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+
+        .quick-price-wrap:hover {
+            background: white;
+            border-color: var(--primary);
+            box-shadow: 0 2px 6px rgba(111, 78, 55, 0.12);
+        }
+
+        .quick-price-wrap .price-val {
+            font-weight: 700;
+            color: var(--primary-dark);
+            font-family: 'Outfit', 'Prompt', sans-serif;
+            font-size: 0.95rem;
+        }
+
+        .quick-price-wrap .price-pen {
+            font-size: 0.7rem;
+            color: var(--primary-light);
+            transition: color 0.15s ease;
+        }
+
+        .quick-price-wrap:hover .price-pen {
+            color: var(--primary);
+        }
+
+        /* Preset Thumbs Expanded in Modal */
+        .preset-thumbs {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(65px, 1fr));
+            gap: 8px;
+            margin-top: 6px;
+            max-height: 190px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+
+        .preset-thumb-btn {
+            border: 2px solid transparent;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #EDE6DD;
+            padding: 0;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            height: 84px;
+            position: relative;
+        }
+
+        .preset-thumb-btn img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .preset-thumb-btn:hover {
+            transform: scale(1.05);
+            border-color: var(--primary);
+            box-shadow: 0 3px 8px rgba(111, 78, 55, 0.2);
+        }
+
+        .preset-thumb-btn .preset-badge {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(44, 37, 35, 0.85);
+            color: white;
+            font-size: 0.58rem;
+            padding: 2px 3px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
         /* Interactive Stock Stepper in Table */
         .stock-control-cell {
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
         }
 
         .stock-step-btn {
-            width: 24px;
+            padding: 2px 6px;
             height: 24px;
             border-radius: 6px;
             border: 1px solid var(--border-color);
             background: white;
             color: var(--text-main);
-            font-size: 0.75rem;
+            font-size: 0.72rem;
             font-weight: 700;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             transition: all 0.15s ease;
+            user-select: none;
         }
 
         .stock-step-btn:hover {
             background: var(--primary-soft);
             border-color: var(--primary);
             color: var(--primary);
-            transform: scale(1.1);
+            transform: scale(1.06);
         }
 
         .stock-step-btn:active {
             transform: scale(0.95);
+        }
+
+        .stock-badge-clickable {
+            cursor: pointer;
+            transition: transform 0.15s ease;
+        }
+
+        .stock-badge-clickable:hover {
+            transform: scale(1.05);
         }
 
         /* 1-Click Interactive Star */
@@ -1540,6 +1756,168 @@ function renderOrderItemsHtml($items_json) {
             transform: translateX(-50%) translateY(0);
             opacity: 1;
             pointer-events: auto;
+        }
+
+        /* Orders Status & Workflow Styling */
+        .badge-shipping {
+            background: #F3E5F5;
+            color: #8E24AA;
+            border: 1px solid rgba(142,36,170,0.2);
+        }
+
+        .row-status-select {
+            padding: 4px 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            border-radius: 6px;
+            border: 1.5px solid var(--border-color);
+            background: #FAF8F5;
+            color: var(--text-main);
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .row-status-select:focus, .row-status-select:hover {
+            border-color: var(--primary);
+            background: white;
+            box-shadow: 0 0 0 2px rgba(111,78,55,0.12);
+        }
+
+        /* Order Item Pills */
+        .order-items-list {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-width: 320px;
+        }
+
+        .order-item-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 3px 8px;
+            background: #F8F5F0;
+            border: 1px solid #EAD8C7;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .order-item-pill:hover {
+            background: #F0E8DD;
+        }
+
+        .order-item-pill .item-title {
+            max-width: 150px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-weight: 500;
+        }
+
+        .order-item-pill .item-qty {
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .order-item-pill .item-subtotal {
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            margin-left: auto;
+        }
+
+        /* Receipt Modal Styles */
+        .receipt-container {
+            background: #FAFAF8;
+            border: 1.5px solid #EAD8C7;
+            border-radius: 14px;
+            padding: 24px;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.02);
+        }
+
+        .receipt-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px dashed #D6C7B2;
+            padding-bottom: 16px;
+            margin-bottom: 16px;
+        }
+
+        .receipt-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            background: white;
+            padding: 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 16px;
+        }
+
+        .receipt-meta-item .lbl {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 2px;
+        }
+
+        .receipt-meta-item .val {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .receipt-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            margin-bottom: 16px;
+        }
+
+        .receipt-table th {
+            background: #FAF5EE;
+            padding: 10px 14px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-align: left;
+        }
+
+        .receipt-table td {
+            padding: 10px 14px;
+            font-size: 0.86rem;
+            border-bottom: 1px solid #F3EDE4;
+        }
+
+        .receipt-summary-box {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background: white;
+            padding: 14px 18px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .receipt-sum-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.88rem;
+            color: var(--text-muted);
+        }
+
+        .receipt-sum-row.total {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--primary-dark);
+            border-top: 1.5px dashed #EAD8C7;
+            padding-top: 8px;
+            margin-top: 4px;
         }
 
         .bulk-count-badge {
@@ -2088,7 +2466,7 @@ function renderOrderItemsHtml($items_json) {
     <!-- Top Navbar -->
     <header class="navbar">
         <a href="index.php" class="brand-logo">
-            <div class="logo-icon"><i class="fa-solid fa-mug-hot"></i></div>
+            <img src="assets/logo.png" alt="CaffeBook Logo" style="width:40px; height:40px; border-radius:10px; object-fit:cover; box-shadow:0 4px 10px rgba(111, 78, 55, 0.2);">
             <span>Caffe<b>Book</b> <small style="font-size:0.72rem; font-weight:700; color:var(--primary); background:var(--primary-soft); padding:2px 8px; border-radius:10px; margin-left:4px; border:1px solid #EAE3D9; vertical-align:middle;">ADMIN</small></span>
         </a>
         <div class="nav-status">
@@ -2213,6 +2591,7 @@ function renderOrderItemsHtml($items_json) {
                                     <th>รหัสคำสั่งซื้อ</th>
                                     <th>ลูกค้า</th>
                                     <th>รายการที่สั่ง</th>
+                                    <th>ช่องทางชำระ</th>
                                     <th>ยอดชำระ</th>
                                     <th>วันที่สั่งซื้อ</th>
                                     <th>สถานะ</th>
@@ -2220,13 +2599,14 @@ function renderOrderItemsHtml($items_json) {
                             </thead>
                             <tbody>
                                 <?php if (empty($orders)): ?>
-                                    <tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding: 2rem;">ยังไม่มีรายการสั่งซื้อ</td></tr>
+                                    <tr><td colspan="7" style="text-align:center; color: var(--text-muted); padding: 2rem;">ยังไม่มีรายการสั่งซื้อ</td></tr>
                                 <?php else: ?>
                                     <?php foreach (array_slice($orders, 0, 5) as $ord): ?>
                                     <tr>
                                         <td><strong><?= htmlspecialchars($ord['id']) ?></strong></td>
                                         <td><?= htmlspecialchars($ord['user_name'] ?? 'ลูกค้า') ?></td>
                                         <td><?= renderOrderItemsHtml($ord['items_detail'] ?? '') ?></td>
+                                        <td><?= renderPaymentBadge($ord['payment_method'] ?? 'สแกน QR Code') ?></td>
                                         <td style="font-weight:600; color:var(--primary-dark); white-space:nowrap;">฿<?= number_format($ord['total_amount'], 2) ?></td>
                                         <td style="color:var(--text-muted); font-size:0.85rem; white-space:nowrap;"><?= htmlspecialchars($ord['order_date']) ?></td>
                                         <td>
@@ -2266,6 +2646,60 @@ function renderOrderItemsHtml($items_json) {
                                 <i class="fa-solid fa-plus"></i> เพิ่มหนังสือใหม่
                             </button>
                         </div>
+                    </div>
+
+                    <!-- Quick-Add Product Bar (⚡ เพิ่มสินค้าด่วนใน 1 บรรทัด) -->
+                    <div class="quick-add-panel">
+                        <div class="quick-add-header">
+                            <div class="quick-add-title">
+                                <i class="fa-solid fa-bolt" style="color:var(--accent);"></i>
+                                <span>เพิ่มรายการสินค้าใหม่ด่วน (Quick Product Adder)</span>
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="quickAddSampleBook()" title="เพิ่มสินค้าตัวอย่างยอดนิยมอัตโนมัติ">
+                                    <i class="fa-solid fa-wand-magic-sparkles"></i> สุ่มสินค้าตัวอย่าง
+                                </button>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="openAddBookModal()">
+                                    <i class="fa-solid fa-expand"></i> ฟอร์มเต็มรูปแบบ
+                                </button>
+                            </div>
+                        </div>
+                        <form id="quickAddBookForm" onsubmit="handleQuickAddBook(event)" class="quick-add-form">
+                            <div style="flex: 2; min-width: 180px;">
+                                <input type="text" id="quickTitle" name="title" class="form-control" placeholder="ชื่อหนังสือ *" required autocomplete="off">
+                            </div>
+                            <div style="flex: 1.4; min-width: 130px;">
+                                <input type="text" id="quickAuthor" name="author" class="form-control" placeholder="ผู้แต่ง / สนพ. *" required autocomplete="off">
+                            </div>
+                            <div style="flex: 1.2; min-width: 120px;">
+                                <select id="quickCategory" name="category" class="form-control">
+                                    <?php foreach ($categories as $cat): ?>
+                                        <?php if ($cat !== 'ทั้งหมด'): ?>
+                                            <option value="<?= htmlspecialchars($cat) ?>"><?= htmlspecialchars($cat) ?></option>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div style="flex: 0.9; min-width: 85px;">
+                                <input type="number" step="0.01" min="1" id="quickPrice" name="price" class="form-control" placeholder="ราคา ฿ *" required>
+                            </div>
+                            <div style="flex: 0.8; min-width: 75px;">
+                                <input type="number" min="0" id="quickStock" name="stock" class="form-control" placeholder="สต็อก" value="20" required>
+                            </div>
+                            <div style="flex: 1.4; min-width: 150px;">
+                                <select id="quickPresetCover" name="cover_url" class="form-control">
+                                    <option value="https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500">🎨 ปกพัฒนาตนเอง</option>
+                                    <option value="https://images.unsplash.com/photo-1592496431122-2349e0fbc666?w=500">💼 ปกธุรกิจ & การเงิน</option>
+                                    <option value="https://images.unsplash.com/photo-1512820790803-83ca734da794?w=500">📚 ปกนิยาย & เรื่องสั้น</option>
+                                    <option value="https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=500">✨ ปกวรรณกรรมคลาสสิก</option>
+                                    <option value="https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500">⚔️ ปกการ์ตูน / มังงะ</option>
+                                    <option value="https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=500">☕ ปกคาเฟ่ & ชีวิตชีวา</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary" style="white-space: nowrap; padding: 8px 16px;">
+                                <i class="fa-solid fa-plus"></i> เพิ่มทันที
+                            </button>
+                        </form>
                     </div>
 
                     <!-- Quick KPI Mini-Bar for Books -->
@@ -2407,22 +2841,31 @@ function renderOrderItemsHtml($items_json) {
                                     </td>
 
                                     <td>
-                                        <span class="badge badge-category"><?= htmlspecialchars($b['category']) ?></span>
+                                        <select class="row-cat-select" onchange="quickChangeCategory('<?= $b['id'] ?>', this.value)" title="คลิกเพื่อเปลี่ยนหมวดหมู่อย่างรวดเร็ว">
+                                            <?php foreach ($categories as $c): ?>
+                                                <?php if ($c !== 'ทั้งหมด'): ?>
+                                                    <option value="<?= htmlspecialchars($c) ?>" <?= $b['category'] === $c ? 'selected' : '' ?>><?= htmlspecialchars($c) ?></option>
+                                                <?php endif; ?>
+                                            <?php endforeach; ?>
+                                        </select>
                                     </td>
 
                                     <td>
-                                        <span style="font-weight:700; color:var(--primary-dark); font-family:'Outfit','Prompt',sans-serif; font-size:0.95rem;">
-                                            ฿<?= number_format($b['price'], 2) ?>
-                                        </span>
+                                        <div class="quick-price-wrap" onclick="quickEditPrice('<?= $b['id'] ?>', <?= $b['price'] ?>)" title="คลิกเพื่อแก้ไขราคาด่วน">
+                                            <span class="price-val" id="priceVal_<?= $b['id'] ?>">฿<?= number_format($b['price'], 2) ?></span>
+                                            <i class="fa-solid fa-pen price-pen"></i>
+                                        </div>
                                     </td>
 
                                     <td>
                                         <div class="stock-control-cell">
-                                            <button type="button" class="stock-step-btn" onclick="quickAdjustStock('<?= $b['id'] ?>', 'dec')" title="ลดสต็อก 1 เล่ม">-</button>
-                                            <span id="stockBadge_<?= $b['id'] ?>" class="badge <?= $b['stock'] <= 0 ? 'badge-danger' : ($b['stock'] <= 5 ? 'badge-warning' : 'badge-success') ?>">
+                                            <button type="button" class="stock-step-btn" onclick="quickAdjustStock('<?= $b['id'] ?>', 'dec', 5)" title="ลดสต็อก 5 เล่ม">-5</button>
+                                            <button type="button" class="stock-step-btn" onclick="quickAdjustStock('<?= $b['id'] ?>', 'dec', 1)" title="ลดสต็อก 1 เล่ม">-1</button>
+                                            <span id="stockBadge_<?= $b['id'] ?>" class="badge stock-badge-clickable <?= $b['stock'] <= 0 ? 'badge-danger' : ($b['stock'] <= 5 ? 'badge-warning' : 'badge-success') ?>" onclick="quickDirectStockEdit('<?= $b['id'] ?>', <?= $b['stock'] ?>)" title="คลิกเพื่อพิมพ์จำนวนสต็อกโดยตรง">
                                                 <?= $b['stock'] <= 0 ? 'หมดสต็อก' : "{$b['stock']} เล่ม" ?>
                                             </span>
-                                            <button type="button" class="stock-step-btn" onclick="quickAdjustStock('<?= $b['id'] ?>', 'inc')" title="เพิ่มสต็อก 1 เล่ม">+</button>
+                                            <button type="button" class="stock-step-btn" onclick="quickAdjustStock('<?= $b['id'] ?>', 'inc', 1)" title="เพิ่มสต็อก 1 เล่ม">+1</button>
+                                            <button type="button" class="stock-step-btn" onclick="quickAdjustStock('<?= $b['id'] ?>', 'inc', 5)" title="เพิ่มสต็อก 5 เล่ม">+5</button>
                                         </div>
                                     </td>
 
@@ -2545,64 +2988,223 @@ function renderOrderItemsHtml($items_json) {
                 </div>
             </section>
 
-            <!-- TAB 3: ORDERS MANAGEMENT -->
+            <!-- TAB 3: ORDERS MANAGEMENT (RE-DESIGNED & EASY TO USE) -->
             <section id="tab-orders" class="tab-section">
                 <div class="content-card">
                     <div class="card-header">
-                        <h2 class="card-title"><i class="fa-solid fa-receipt"></i> จัดการคำสั่งซื้อ (<?= count($orders) ?> รายการ)</h2>
+                        <h2 class="card-title">
+                            <i class="fa-solid fa-receipt"></i> 
+                            <span>จัดการคำสั่งซื้อ (Orders Management)</span>
+                            <span class="title-count" id="orderHeaderCount"><?= count($orders) ?> รายการ</span>
+                        </h2>
+                        <div class="card-actions">
+                            <button class="btn btn-secondary" onclick="quickAddSampleOrder()" title="จำลองคำสั่งซื้อใหม่เข้าระบบ">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> สุ่มสร้างออเดอร์ทดสอบ
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="location.reload()" title="รีเฟรชข้อมูลคำสั่งซื้อ">
+                                <i class="fa-solid fa-arrows-rotate"></i> รีเฟรช
+                            </button>
+                        </div>
                     </div>
-                    <div class="table-responsive">
-                        <table>
+
+                    <!-- Orders KPI Summary Mini-Bar -->
+                    <div class="book-kpi-bar">
+                        <div class="kpi-mini-card active" id="kpiOrderAll" onclick="filterOrdersByKPI('all')">
+                            <div class="kpi-mini-icon all"><i class="fa-solid fa-layer-group"></i></div>
+                            <div class="kpi-mini-info">
+                                <div class="val"><?= count($orders) ?></div>
+                                <div class="lbl">ออเดอร์ทั้งหมด</div>
+                            </div>
+                        </div>
+                        <div class="kpi-mini-card" id="kpiOrderPending" onclick="filterOrdersByKPI('pending')">
+                            <div class="kpi-mini-icon low"><i class="fa-solid fa-clock"></i></div>
+                            <div class="kpi-mini-info">
+                                <div class="val"><?= $orders_pending ?></div>
+                                <div class="lbl">รอดำเนินการ</div>
+                            </div>
+                        </div>
+                        <div class="kpi-mini-card" id="kpiOrderPaid" onclick="filterOrdersByKPI('paid')">
+                            <div class="kpi-mini-icon stock"><i class="fa-solid fa-circle-check"></i></div>
+                            <div class="kpi-mini-info">
+                                <div class="val"><?= $orders_paid ?></div>
+                                <div class="lbl">ชำระเงินแล้ว</div>
+                            </div>
+                        </div>
+                        <div class="kpi-mini-card" id="kpiOrderShipping" onclick="filterOrdersByKPI('shipping')">
+                            <div class="kpi-mini-icon feat"><i class="fa-solid fa-truck-fast"></i></div>
+                            <div class="kpi-mini-info">
+                                <div class="val"><?= $orders_shipping ?></div>
+                                <div class="lbl">กำลังจัดส่ง</div>
+                            </div>
+                        </div>
+                        <div class="kpi-mini-card" id="kpiOrderDelivered" onclick="filterOrdersByKPI('delivered')">
+                            <div class="kpi-mini-icon stock"><i class="fa-solid fa-box-open"></i></div>
+                            <div class="kpi-mini-info">
+                                <div class="val"><?= $orders_delivered ?></div>
+                                <div class="lbl">จัดส่งสำเร็จ</div>
+                            </div>
+                        </div>
+                        <div class="kpi-mini-card" id="kpiOrderCancelled" onclick="filterOrdersByKPI('cancelled')">
+                            <div class="kpi-mini-icon out"><i class="fa-solid fa-ban"></i></div>
+                            <div class="kpi-mini-info">
+                                <div class="val"><?= $orders_cancelled ?></div>
+                                <div class="lbl">ยกเลิก</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Search & Filter Controls Toolbar for Orders -->
+                    <div class="toolbar-box">
+                        <div class="toolbar-top-row">
+                            <div class="search-box-wrapper">
+                                <i class="fa-solid fa-magnifying-glass icon-search"></i>
+                                <input type="text" id="orderSearchInput" placeholder="ค้นหารหัสออเดอร์ (#ID), ชื่อลูกค้า, รายการหนังสือ..." oninput="handleOrderSearchInput()">
+                                <button type="button" class="clear-search-btn" id="clearOrderSearchBtn" onclick="clearOrderSearch()" title="ล้างการค้นหา">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                            
+                            <div class="filter-controls-group">
+                                <!-- Status Filter -->
+                                <select id="orderStatusFilterSelect" class="select-filter" onchange="applyOrdersFilter()">
+                                    <option value="all">🏷️ สถานะ: ทั้งหมด</option>
+                                    <option value="pending">⏳ รอดำเนินการ (รอชำระ / COD)</option>
+                                    <option value="ชำระเงินแล้ว">💳 ชำระเงินแล้ว</option>
+                                    <option value="กำลังจัดส่ง">🚚 กำลังจัดส่ง</option>
+                                    <option value="จัดส่งแล้ว">✅ จัดส่งแล้ว (สำเร็จ)</option>
+                                    <option value="ยกเลิก">❌ ยกเลิก</option>
+                                </select>
+
+                                <!-- Payment Method Filter -->
+                                <select id="orderPaymentFilterSelect" class="select-filter" onchange="applyOrdersFilter()">
+                                    <option value="all">💳 การชำระ: ทั้งหมด</option>
+                                    <option value="QR">📱 สแกน QR Code / PromptPay</option>
+                                    <option value="บัตร">💳 บัตรเครดิต/เดบิต</option>
+                                    <option value="ปลายทาง">📦 เก็บเงินปลายทาง (COD)</option>
+                                </select>
+
+                                <!-- Sort Dropdown -->
+                                <select id="orderSortSelect" class="select-filter" onchange="applyOrdersFilter()">
+                                    <option value="date_desc">🕒 วันที่: ล่าสุด ➔ เก่าสุด</option>
+                                    <option value="date_asc">🕒 วันที่: เก่าสุด ➔ ล่าสุด</option>
+                                    <option value="amount_desc">💰 ยอดเงิน: มาก ➔ น้อย</option>
+                                    <option value="amount_asc">💵 ยอดเงิน: น้อย ➔ มาก</option>
+                                </select>
+
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="resetOrdersFilter()" title="รีเซ็ตตัวกรอง">
+                                    <i class="fa-solid fa-arrow-rotate-left"></i> รีเซ็ต
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Orders Table View Container -->
+                    <div id="ordersTableView" class="table-responsive">
+                        <table id="ordersTable">
                             <thead>
                                 <tr>
+                                    <th style="width: 40px; text-align: center;">
+                                        <input type="checkbox" id="selectAllOrders" class="custom-chk" onchange="toggleSelectAllOrders(this)">
+                                    </th>
                                     <th>รหัสคำสั่งซื้อ</th>
-                                    <th>ชื่อลูกค้า</th>
-                                    <th>รายการหนังสือที่สั่งซื้อ</th>
+                                    <th>ข้อมูลลูกค้า</th>
+                                    <th>รายการที่สั่งซื้อ</th>
+                                    <th>การชำระเงิน</th>
                                     <th>ยอดรวม</th>
                                     <th>วันที่สั่งซื้อ</th>
-                                    <th>สถานะปัจจุบัน</th>
-                                    <th>เปลี่ยนสถานะ</th>
+                                    <th>สถานะ</th>
+                                    <th>เปลี่ยนสถานะด่วน</th>
                                     <th style="text-align: right;">จัดการ</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="ordersTableBody">
                                 <?php if (empty($orders)): ?>
-                                <tr><td colspan="8" style="text-align:center; color: var(--text-muted); padding: 2.5rem;">ยังไม่มีคำสั่งซื้อในระบบ</td></tr>
+                                <tr><td colspan="10" style="text-align:center; color: var(--text-muted); padding: 3rem;">ยังไม่มีรายการสั่งซื้อในระบบ</td></tr>
                                 <?php else: ?>
                                 <?php foreach ($orders as $ord): ?>
-                                <tr>
-                                    <td><strong style="color:var(--primary-dark); font-family:monospace;"><?= htmlspecialchars($ord['id']) ?></strong></td>
-                                    <td>
-                                        <div style="font-weight:600; color:var(--text-main);"><?= htmlspecialchars($ord['user_name'] ?? 'ลูกค้า') ?></div>
-                                        <div style="font-size:0.75rem; color:var(--text-muted);">User ID: <?= htmlspecialchars($ord['user_id'] ?? '-') ?></div>
+                                <tr class="order-item-row"
+                                    id="orderRow_<?= $ord['id'] ?>"
+                                    data-id="<?= htmlspecialchars($ord['id']) ?>"
+                                    data-customer="<?= strtolower(htmlspecialchars($ord['user_name'] ?? '')) ?>"
+                                    data-userid="<?= strtolower(htmlspecialchars($ord['user_id'] ?? '')) ?>"
+                                    data-status="<?= htmlspecialchars($ord['status'] ?? 'รอชำระเงิน') ?>"
+                                    data-payment="<?= htmlspecialchars($ord['payment_method'] ?? 'สแกน QR Code') ?>"
+                                    data-amount="<?= floatval($ord['total_amount'] ?? 0) ?>"
+                                    data-date="<?= htmlspecialchars($ord['order_date'] ?? '') ?>"
+                                    data-items='<?= htmlspecialchars($ord['items_detail'] ?? '[]', ENT_QUOTES, 'UTF-8') ?>'
+                                    data-json='<?= htmlspecialchars(json_encode($ord), ENT_QUOTES, 'UTF-8') ?>'>
+                                    
+                                    <td style="text-align: center;">
+                                        <input type="checkbox" class="custom-chk order-select-chk" value="<?= htmlspecialchars($ord['id']) ?>" onchange="handleOrderSelectChange()">
                                     </td>
-                                    <td><?= renderOrderItemsHtml($ord['items_detail'] ?? '') ?></td>
-                                    <td style="font-weight:700; color:var(--primary-dark); font-family:'Outfit','Prompt',sans-serif; white-space:nowrap;">฿<?= number_format($ord['total_amount'], 2) ?></td>
-                                    <td style="color:var(--text-muted); font-size:0.82rem; white-space:nowrap;"><?= htmlspecialchars($ord['order_date']) ?></td>
+
                                     <td>
-                                        <span class="badge <?= $ord['status'] === 'จัดส่งแล้ว' || $ord['status'] === 'ชำระเงินแล้ว' ? 'badge-success' : ($ord['status'] === 'ยกเลิก' ? 'badge-danger' : 'badge-warning') ?>">
-                                            <?= htmlspecialchars($ord['status']) ?>
+                                        <a href="javascript:void(0)" onclick="openOrderReceiptModal('<?= $ord['id'] ?>')" style="font-weight:700; color:var(--primary-dark); font-family:monospace; font-size:0.92rem; text-decoration:underline;">
+                                            #<?= htmlspecialchars($ord['id']) ?>
+                                        </a>
+                                    </td>
+
+                                    <td>
+                                        <div style="font-weight:600; color:var(--text-main); font-size:0.9rem;"><?= htmlspecialchars($ord['user_name'] ?? 'ลูกค้า') ?></div>
+                                        <div style="font-size:0.75rem; color:var(--text-muted);">ID: <?= htmlspecialchars($ord['user_id'] ?? '-') ?></div>
+                                    </td>
+
+                                    <td><?= renderOrderItemsHtml($ord['items_detail'] ?? '', $ord['id']) ?></td>
+
+                                    <td><?= renderPaymentBadge($ord['payment_method'] ?? 'สแกน QR Code') ?></td>
+
+                                    <td>
+                                        <span style="font-weight:700; color:var(--primary-dark); font-family:'Outfit','Prompt',sans-serif; font-size:0.98rem; white-space:nowrap;">
+                                            ฿<?= number_format($ord['total_amount'], 2) ?>
                                         </span>
                                     </td>
+
+                                    <td style="color:var(--text-muted); font-size:0.8rem; white-space:nowrap;"><?= htmlspecialchars($ord['order_date']) ?></td>
+
                                     <td>
-                                        <select class="select-filter" style="padding: 6px 10px; font-size: 0.84rem; width:130px;" onchange="updateOrderStatus('<?= $ord['id'] ?>', this.value)">
-                                            <option value="รอชำระเงิน" <?= $ord['status'] === 'รอชำระเงิน' ? 'selected' : '' ?>>รอชำระเงิน</option>
-                                            <option value="ชำระเงินแล้ว" <?= $ord['status'] === 'ชำระเงินแล้ว' ? 'selected' : '' ?>>ชำระเงินแล้ว</option>
-                                            <option value="กำลังจัดส่ง" <?= $ord['status'] === 'กำลังจัดส่ง' ? 'selected' : '' ?>>กำลังจัดส่ง</option>
-                                            <option value="จัดส่งแล้ว" <?= $ord['status'] === 'จัดส่งแล้ว' ? 'selected' : '' ?>>จัดส่งแล้ว</option>
-                                            <option value="ยกเลิก" <?= $ord['status'] === 'ยกเลิก' ? 'selected' : '' ?>>ยกเลิก</option>
-                                        </select>
+                                        <span id="orderStatusBadge_<?= $ord['id'] ?>">
+                                            <?= renderOrderStatusBadge($ord['status']) ?>
+                                        </span>
                                     </td>
+
+                                    <td>
+                                        <div style="display:flex; align-items:center; gap:6px;">
+                                            <select class="row-status-select" id="orderStatusSelect_<?= $ord['id'] ?>" onchange="quickSetOrderStatus('<?= $ord['id'] ?>', this.value)">
+                                                <option value="รอเก็บเงินปลายทาง" <?= $ord['status'] === 'รอเก็บเงินปลายทาง' ? 'selected' : '' ?>>⏳ รอเก็บปลายทาง</option>
+                                                <option value="รอชำระเงิน" <?= $ord['status'] === 'รอชำระเงิน' ? 'selected' : '' ?>>⏳ รอชำระเงิน</option>
+                                                <option value="ชำระเงินแล้ว" <?= $ord['status'] === 'ชำระเงินแล้ว' ? 'selected' : '' ?>>💳 ชำระเงินแล้ว</option>
+                                                <option value="กำลังจัดส่ง" <?= $ord['status'] === 'กำลังจัดส่ง' ? 'selected' : '' ?>>🚚 กำลังจัดส่ง</option>
+                                                <option value="จัดส่งแล้ว" <?= $ord['status'] === 'จัดส่งแล้ว' ? 'selected' : '' ?>>✅ จัดส่งแล้ว</option>
+                                                <option value="ยกเลิก" <?= $ord['status'] === 'ยกเลิก' ? 'selected' : '' ?>>❌ ยกเลิก</option>
+                                            </select>
+                                        </div>
+                                    </td>
+
                                     <td style="text-align: right;">
-                                        <button class="btn btn-danger btn-sm" onclick="deleteOrder('<?= $ord['id'] ?>')" title="ลบออเดอร์">
-                                            <i class="fa-solid fa-trash"></i>
-                                        </button>
+                                        <div style="display:inline-flex; gap:4px;">
+                                            <button class="btn btn-secondary btn-icon btn-sm" onclick="openOrderReceiptModal('<?= $ord['id'] ?>')" title="ดูใบเสร็จ / รายละเอียดคำสั่งซื้อ">
+                                                <i class="fa-solid fa-receipt"></i>
+                                            </button>
+                                            <button class="btn btn-danger btn-icon btn-sm" onclick="deleteOrder('<?= $ord['id'] ?>')" title="ลบคำสั่งซื้อ">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 <?php endforeach; ?>
                                 <?php endif; ?>
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Empty Order State -->
+                    <div id="ordersEmptyState" class="empty-state" style="display: none;">
+                        <i class="fa-solid fa-receipt"></i>
+                        <h3>ไม่พบข้อมูลคำสั่งซื้อ</h3>
+                        <p>ไม่มีคำสั่งซื้อที่ตรงกับเงื่อนไขการค้นหาหรือสถานะที่เลือก</p>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="resetOrdersFilter()">
+                            <i class="fa-solid fa-filter-circle-xmark"></i> ล้างตัวกรองทั้งหมด
+                        </button>
                     </div>
                 </div>
             </section>
@@ -2731,10 +3333,10 @@ function renderOrderItemsHtml($items_json) {
         </main>
     </div>
 
-    <!-- FLOATING BULK ACTIONS BAR -->
+    <!-- FLOATING BULK ACTIONS BAR (BOOKS) -->
     <div id="bulkActionsBar" class="bulk-actions-bar">
         <span class="bulk-count-badge" id="bulkSelectedCount">0 เล่ม</span>
-        <span style="font-size:0.88rem;">รายการที่เลือก:</span>
+        <span style="font-size:0.88rem;">หนังสือที่เลือก:</span>
         <button type="button" class="btn btn-secondary btn-sm" onclick="bulkChangeCategoryModal()" style="background:#4A3E39; color:white; border-color:#5E4F49;">
             <i class="fa-solid fa-tags"></i> เปลี่ยนหมวดหมู่
         </button>
@@ -2744,6 +3346,128 @@ function renderOrderItemsHtml($items_json) {
         <button type="button" class="btn btn-secondary btn-sm" onclick="clearBulkSelection()" style="background:transparent; color:#bbb; border:none;">
             <i class="fa-solid fa-xmark"></i> ยกเลิก
         </button>
+    </div>
+
+    <!-- FLOATING BULK ACTIONS BAR (ORDERS) -->
+    <div id="bulkOrdersBar" class="bulk-actions-bar">
+        <span class="bulk-count-badge" id="bulkOrdersSelectedCount">0 รายการ</span>
+        <span style="font-size:0.88rem;">ออเดอร์ที่เลือก:</span>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="bulkUpdateOrdersStatusModal('ชำระเงินแล้ว')" style="background:#2980B9; color:white; border-color:#2471A3;">
+            <i class="fa-solid fa-circle-check"></i> ชำระแล้ว
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="bulkUpdateOrdersStatusModal('กำลังจัดส่ง')" style="background:#8E24AA; color:white; border-color:#7B1FA2;">
+            <i class="fa-solid fa-truck-fast"></i> กำลังจัดส่ง
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="bulkUpdateOrdersStatusModal('จัดส่งแล้ว')" style="background:#27AE60; color:white; border-color:#229954;">
+            <i class="fa-solid fa-box-open"></i> จัดส่งแล้ว
+        </button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="bulkDeleteSelectedOrders()">
+            <i class="fa-solid fa-trash"></i> ลบที่เลือก
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="clearBulkOrdersSelection()" style="background:transparent; color:#bbb; border:none;">
+            <i class="fa-solid fa-xmark"></i> ยกเลิก
+        </button>
+    </div>
+
+    <!-- MODAL: ORDER RECEIPT & DETAILS -->
+    <div id="orderReceiptModal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 680px;">
+            <div class="modal-header">
+                <h3><i class="fa-solid fa-file-invoice-dollar"></i> ใบเสร็จคำสั่งซื้อ (Order Receipt)</h3>
+                <button class="modal-close" onclick="closeOrderReceiptModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="receipt-container" id="printableReceiptArea">
+                    <div class="receipt-header-row">
+                        <div>
+                            <div style="font-size: 1.35rem; font-weight: 800; color: var(--primary-dark); display:flex; align-items:center; gap:8px;">
+                                <img src="assets/logo.png" alt="logo" style="width:36px; height:36px; border-radius:8px; object-fit:cover;">
+                                <span>Caffe<b>Book</b></span>
+                            </div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top:2px;">ร้านหนังสือและกาแฟพรีเมียม CaffeBook Store</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 1.15rem; font-weight: 800; color: var(--primary); font-family: monospace;" id="rcptOrderId">#CB-000000</div>
+                            <div style="font-size: 0.78rem; color: var(--text-muted);" id="rcptOrderDate">-</div>
+                        </div>
+                    </div>
+
+                    <div class="receipt-meta-grid">
+                        <div class="receipt-meta-item">
+                            <div class="lbl">ชื่อลูกค้าผู้สั่งซื้อ</div>
+                            <div class="val" id="rcptCustomerName">-</div>
+                        </div>
+                        <div class="receipt-meta-item">
+                            <div class="lbl">รหัสผู้ใช้งาน (User ID)</div>
+                            <div class="val" id="rcptUserId" style="font-family: monospace; font-size: 0.82rem;">-</div>
+                        </div>
+                        <div class="receipt-meta-item">
+                            <div class="lbl">ช่องทางการชำระเงิน</div>
+                            <div class="val" id="rcptPaymentMethod">-</div>
+                        </div>
+                        <div class="receipt-meta-item">
+                            <div class="lbl">สถานะคำสั่งซื้อ</div>
+                            <div class="val" id="rcptStatusBadge">-</div>
+                        </div>
+                    </div>
+
+                    <div style="font-weight: 700; font-size: 0.88rem; color: var(--text-main); margin-bottom: 8px;">
+                        <i class="fa-solid fa-list-check"></i> รายการสินค้าที่สั่งซื้อ:
+                    </div>
+                    <table class="receipt-table">
+                        <thead>
+                            <tr>
+                                <th>รายการ</th>
+                                <th style="text-align:center; width:60px;">จำนวน</th>
+                                <th style="text-align:right; width:90px;">ราคา/เล่ม</th>
+                                <th style="text-align:right; width:100px;">รวม</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rcptItemsTableBody">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+
+                    <div class="receipt-summary-box">
+                        <div class="receipt-sum-row">
+                            <span>ยอดรวมค่าสินค้า:</span>
+                            <span id="rcptSubtotal">฿0.00</span>
+                        </div>
+                        <div class="receipt-sum-row">
+                            <span>ค่าจัดส่ง:</span>
+                            <span style="color:var(--success); font-weight:600;">ฟรี (Free Shipping)</span>
+                        </div>
+                        <div class="receipt-sum-row total">
+                            <span>ยอดชำระสุทธิ (Net Total):</span>
+                            <span id="rcptGrandTotal" style="color:var(--accent);">฿0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Receipt Modal Action Footer -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; flex-wrap:wrap; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:0.85rem; font-weight:600; color:var(--text-main);">เปลี่ยนสถานะ:</span>
+                        <select id="rcptStatusSelect" class="row-status-select" style="padding:7px 12px; font-size:0.85rem;" onchange="updateOrderStatusFromModal(this.value)">
+                            <option value="รอเก็บเงินปลายทาง">⏳ รอเก็บเงินปลายทาง</option>
+                            <option value="รอชำระเงิน">⏳ รอชำระเงิน</option>
+                            <option value="ชำระเงินแล้ว">💳 ชำระเงินแล้ว</option>
+                            <option value="กำลังจัดส่ง">🚚 กำลังจัดส่ง</option>
+                            <option value="จัดส่งแล้ว">✅ จัดส่งแล้ว</option>
+                            <option value="ยกเลิก">❌ ยกเลิก</option>
+                        </select>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="printOrderReceipt()">
+                            <i class="fa-solid fa-print"></i> พิมพ์ใบเสร็จ
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="closeOrderReceiptModal()">
+                            ปิดหน้าต่าง
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- MODAL: ADD / EDIT BOOK (2-COLUMN MODERN FORM) -->
@@ -2765,22 +3489,47 @@ function renderOrderItemsHtml($items_json) {
                             </div>
 
                             <div class="preset-covers-bar">
-                                <p><i class="fa-solid fa-wand-magic-sparkles"></i> เลือกรูปตัวอย่างสวยๆ:</p>
+                                <p><i class="fa-solid fa-wand-magic-sparkles"></i> เลือกรูปปกสำเร็จรูปยอดนิยม:</p>
                                 <div class="preset-thumbs">
                                     <button type="button" class="preset-thumb-btn" onclick="applyPresetCover('https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500')" title="พัฒนาตนเอง">
                                         <img src="https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=100" alt="preset">
+                                        <span class="preset-badge">พัฒนาตนเอง</span>
                                     </button>
                                     <button type="button" class="preset-thumb-btn" onclick="applyPresetCover('https://images.unsplash.com/photo-1592496431122-2349e0fbc666?w=500')" title="ธุรกิจ">
                                         <img src="https://images.unsplash.com/photo-1592496431122-2349e0fbc666?w=100" alt="preset">
+                                        <span class="preset-badge">ธุรกิจ/เงิน</span>
                                     </button>
                                     <button type="button" class="preset-thumb-btn" onclick="applyPresetCover('https://images.unsplash.com/photo-1512820790803-83ca734da794?w=500')" title="นิยาย">
                                         <img src="https://images.unsplash.com/photo-1512820790803-83ca734da794?w=100" alt="preset">
+                                        <span class="preset-badge">นิยาย</span>
                                     </button>
                                     <button type="button" class="preset-thumb-btn" onclick="applyPresetCover('https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=500')" title="วรรณกรรม">
                                         <img src="https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=100" alt="preset">
+                                        <span class="preset-badge">วรรณกรรม</span>
                                     </button>
                                     <button type="button" class="preset-thumb-btn" onclick="applyPresetCover('https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500')" title="มังงะ">
                                         <img src="https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=100" alt="preset">
+                                        <span class="preset-badge">การ์ตูน</span>
+                                    </button>
+                                    <button type="button" class="preset-thumb-btn" onclick="applyPresetCover('https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=500')" title="คาเฟ่">
+                                        <img src="https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=100" alt="preset">
+                                        <span class="preset-badge">คาเฟ่</span>
+                                    </button>
+                                    <button type="button" class="preset-thumb-btn" onclick="applyPresetCover('https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=500')" title="การเงิน">
+                                        <img src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=100" alt="preset">
+                                        <span class="preset-badge">การเงิน</span>
+                                    </button>
+                                    <button type="button" class="preset-thumb-btn" onclick="applyPresetCover('https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=500')" title="ปรัชญา">
+                                        <img src="https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=100" alt="preset">
+                                        <span class="preset-badge">ปรัชญา</span>
+                                    </button>
+                                    <button type="button" class="preset-thumb-btn" onclick="applyPresetCover('https://images.unsplash.com/photo-1516979187457-637abb4f9353?w=500')" title="แฟนตาซี">
+                                        <img src="https://images.unsplash.com/photo-1516979187457-637abb4f9353?w=100" alt="preset">
+                                        <span class="preset-badge">แฟนตาซี</span>
+                                    </button>
+                                    <button type="button" class="preset-thumb-btn" onclick="applyPresetCover('https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=500')" title="เทคโนโลยี">
+                                        <img src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=100" alt="preset">
+                                        <span class="preset-badge">เทคโนโลยี</span>
                                     </button>
                                 </div>
                             </div>
@@ -3216,14 +3965,224 @@ function renderOrderItemsHtml($items_json) {
             }
         }
 
+        // Quick 1-Line Book Adder
+        async function handleQuickAddBook(e) {
+            e.preventDefault();
+            const form = document.getElementById('quickAddBookForm');
+            const formData = new FormData(form);
+            formData.append('action', 'add_book');
+            formData.append('rating', '4.8');
+            formData.append('pages', '220');
+
+            try {
+                const res = await fetch('admin_actions.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'เพิ่มสินค้าสำเร็จ!',
+                        text: data.message,
+                        timer: 1300,
+                        showConfirmButton: false
+                    }).then(() => location.reload());
+                } else {
+                    Swal.fire('ข้อผิดพลาด', data.message, 'error');
+                }
+            } catch (err) {
+                Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+            }
+        }
+
+        // Quick Add Sample Book (1-Click)
+        async function quickAddSampleBook() {
+            try {
+                Swal.fire({
+                    title: 'กำลังสุ่มสร้างสินค้าตัวอย่าง...',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+
+                const fd = new FormData();
+                fd.append('action', 'quick_add_sample');
+
+                const res = await fetch('admin_actions.php', { method: 'POST', body: fd });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'สำเร็จ!',
+                        text: data.message,
+                        timer: 1500,
+                        showConfirmButton: false
+                    }).then(() => location.reload());
+                } else {
+                    Swal.fire('ข้อผิดพลาด', data.message, 'error');
+                }
+            } catch (err) {
+                Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเพิ่มสินค้าตัวอย่างได้', 'error');
+            }
+        }
+
+        // Quick Inline Category Change
+        async function quickChangeCategory(id, newCat) {
+            try {
+                const fd = new FormData();
+                fd.append('action', 'update_category');
+                fd.append('id', id);
+                fd.append('category', newCat);
+
+                const res = await fetch('admin_actions.php', { method: 'POST', body: fd });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    const row = document.getElementById(`bookRow_${id}`);
+                    if (row) row.setAttribute('data-category', newCat);
+                    const card = document.getElementById(`bookCard_${id}`);
+                    if (card) card.setAttribute('data-category', newCat);
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: data.message,
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 1500
+                    });
+                } else {
+                    Swal.fire('ข้อผิดพลาด', data.message, 'error');
+                }
+            } catch (err) {
+                Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเปลี่ยนหมวดหมู่ได้', 'error');
+            }
+        }
+
+        // Quick Inline Price Edit
+        function quickEditPrice(id, currentPrice) {
+            Swal.fire({
+                title: 'แก้ไขราคาขาย (บาท)',
+                input: 'number',
+                inputValue: currentPrice,
+                inputAttributes: {
+                    min: 1,
+                    step: 0.5
+                },
+                showCancelButton: true,
+                confirmButtonColor: '#6F4E37',
+                confirmButtonText: 'บันทึกราคา',
+                cancelButtonText: 'ยกเลิก',
+                inputValidator: (val) => {
+                    if (!val || parseFloat(val) <= 0) {
+                        return 'กรุณากรอกราคาที่มากกว่า 0 บาท';
+                    }
+                }
+            }).then(async (res) => {
+                if (res.isConfirmed && res.value) {
+                    const newPrice = parseFloat(res.value);
+                    const fd = new FormData();
+                    fd.append('action', 'update_price');
+                    fd.append('id', id);
+                    fd.append('price', newPrice);
+
+                    const response = await fetch('admin_actions.php', { method: 'POST', body: fd });
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        const priceEl = document.getElementById(`priceVal_${id}`);
+                        if (priceEl) priceEl.innerText = `฿${newPrice.toFixed(2)}`;
+                        const row = document.getElementById(`bookRow_${id}`);
+                        if (row) row.setAttribute('data-price', newPrice);
+                        const card = document.getElementById(`bookCard_${id}`);
+                        if (card) card.setAttribute('data-price', newPrice);
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: data.message,
+                            toast: true,
+                            position: 'top-end',
+                            showConfirmButton: false,
+                            timer: 1500
+                        });
+                    } else {
+                        Swal.fire('ข้อผิดพลาด', data.message, 'error');
+                    }
+                }
+            });
+        }
+
+        // Quick Direct Stock Edit (Click on badge)
+        function quickDirectStockEdit(id, currentStock) {
+            Swal.fire({
+                title: 'กำหนดจำนวนสต็อกคงเหลือ',
+                input: 'number',
+                inputValue: currentStock,
+                inputAttributes: { min: 0, step: 1 },
+                showCancelButton: true,
+                confirmButtonColor: '#6F4E37',
+                confirmButtonText: 'บันทึกสต็อก',
+                cancelButtonText: 'ยกเลิก',
+                inputValidator: (val) => {
+                    if (val === '' || parseInt(val) < 0) {
+                        return 'กรุณากรอกจำนวนสต็อกที่ถูกต้อง (≥ 0)';
+                    }
+                }
+            }).then(async (res) => {
+                if (res.isConfirmed && res.value !== '') {
+                    const newStock = parseInt(res.value);
+                    const fd = new FormData();
+                    fd.append('action', 'update_stock');
+                    fd.append('id', id);
+                    fd.append('type', 'set');
+                    fd.append('stock', newStock);
+
+                    const response = await fetch('admin_actions.php', { method: 'POST', body: fd });
+                    const data = await response.json();
+
+                    if (data.status === 'success') {
+                        const badge = document.getElementById(`stockBadge_${id}`);
+                        if (badge) {
+                            badge.className = `badge stock-badge-clickable ${newStock <= 0 ? 'badge-danger' : (newStock <= 5 ? 'badge-warning' : 'badge-success')}`;
+                            badge.innerText = newStock <= 0 ? 'หมดสต็อก' : `${newStock} เล่ม`;
+                        }
+                        const gridBadge = document.getElementById(`gridStockBadge_${id}`);
+                        if (gridBadge) {
+                            gridBadge.className = `badge ${newStock <= 0 ? 'badge-danger' : (newStock <= 5 ? 'badge-warning' : 'badge-success')}`;
+                            gridBadge.innerText = newStock <= 0 ? 'หมดสต็อก' : `${newStock} เล่ม`;
+                        }
+                        const gridNum = document.getElementById(`gridStockNum_${id}`);
+                        if (gridNum) gridNum.innerText = newStock;
+
+                        const row = document.getElementById(`bookRow_${id}`);
+                        if (row) row.setAttribute('data-stock', newStock);
+                        const card = document.getElementById(`bookCard_${id}`);
+                        if (card) card.setAttribute('data-stock', newStock);
+
+                        Swal.fire({
+                            icon: 'success',
+                            title: data.message,
+                            toast: true,
+                            position: 'top-end',
+                            showConfirmButton: false,
+                            timer: 1500
+                        });
+                    } else {
+                        Swal.fire('ข้อผิดพลาด', data.message, 'error');
+                    }
+                }
+            });
+        }
+
         // Quick Stock Increment / Decrement
-        async function quickAdjustStock(id, type) {
+        async function quickAdjustStock(id, type, delta = 1) {
             try {
                 const fd = new FormData();
                 fd.append('action', 'update_stock');
                 fd.append('id', id);
                 fd.append('type', type);
-                fd.append('delta', '1');
+                fd.append('delta', delta.toString());
 
                 const res = await fetch('admin_actions.php', { method: 'POST', body: fd });
                 const data = await res.json();
@@ -3234,7 +4193,7 @@ function renderOrderItemsHtml($items_json) {
                     // Update Table badge
                     const badge = document.getElementById(`stockBadge_${id}`);
                     if (badge) {
-                        badge.className = `badge ${newStock <= 0 ? 'badge-danger' : (newStock <= 5 ? 'badge-warning' : 'badge-success')}`;
+                        badge.className = `badge stock-badge-clickable ${newStock <= 0 ? 'badge-danger' : (newStock <= 5 ? 'badge-warning' : 'badge-success')}`;
                         badge.innerText = newStock <= 0 ? 'หมดสต็อก' : `${newStock} เล่ม`;
                     }
 
@@ -3550,30 +4509,514 @@ function renderOrderItemsHtml($items_json) {
             });
         }
 
-        // Update Order Status
-        async function updateOrderStatus(id, status) {
-            const fd = new FormData();
-            fd.append('action', 'update_order_status');
-            fd.append('id', id);
-            fd.append('status', status);
+        // ==========================================
+        // ORDERS MANAGEMENT JAVASCRIPT LOGIC
+        // ==========================================
+        let currentOrderKPIFilter = 'all';
+        let currentReceiptOrderId = '';
 
-            const res = await fetch('admin_actions.php', { method: 'POST', body: fd });
-            const data = await res.json();
-            if (data.status === 'success') {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'อัปเดตสถานะสำเร็จ',
-                    toast: true,
-                    position: 'top-end',
-                    showConfirmButton: false,
-                    timer: 2000
-                });
-            } else {
-                Swal.fire('ข้อผิดพลาด', data.message, 'error');
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // Live Search Handler for Orders
+        function handleOrderSearchInput() {
+            const val = document.getElementById('orderSearchInput').value;
+            const clearBtn = document.getElementById('clearOrderSearchBtn');
+            if (clearBtn) clearBtn.style.display = val.length > 0 ? 'flex' : 'none';
+            applyOrdersFilter();
+        }
+
+        function clearOrderSearch() {
+            const input = document.getElementById('orderSearchInput');
+            if (input) input.value = '';
+            const clearBtn = document.getElementById('clearOrderSearchBtn');
+            if (clearBtn) clearBtn.style.display = 'none';
+            applyOrdersFilter();
+        }
+
+        // Quick Orders KPI Filter Click
+        function filterOrdersByKPI(kpi) {
+            currentOrderKPIFilter = kpi;
+            
+            // Update active KPI mini-card
+            const kpiIds = {
+                'all': 'kpiOrderAll',
+                'pending': 'kpiOrderPending',
+                'paid': 'kpiOrderPaid',
+                'shipping': 'kpiOrderShipping',
+                'delivered': 'kpiOrderDelivered',
+                'cancelled': 'kpiOrderCancelled'
+            };
+            
+            Object.values(kpiIds).forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.remove('active');
+            });
+            
+            const activeEl = document.getElementById(kpiIds[kpi]);
+            if (activeEl) activeEl.classList.add('active');
+
+            // Sync with dropdown filter
+            const selectEl = document.getElementById('orderStatusFilterSelect');
+            if (selectEl) {
+                if (kpi === 'all') selectEl.value = 'all';
+                else if (kpi === 'pending') selectEl.value = 'pending';
+                else if (kpi === 'paid') selectEl.value = 'ชำระเงินแล้ว';
+                else if (kpi === 'shipping') selectEl.value = 'กำลังจัดส่ง';
+                else if (kpi === 'delivered') selectEl.value = 'จัดส่งแล้ว';
+                else if (kpi === 'cancelled') selectEl.value = 'ยกเลิก';
+            }
+
+            applyOrdersFilter();
+        }
+
+        // Master Filter & Sort function for Orders
+        function applyOrdersFilter() {
+            const search = (document.getElementById('orderSearchInput')?.value || '').trim().toLowerCase();
+            const statusFilter = document.getElementById('orderStatusFilterSelect')?.value || 'all';
+            const paymentFilter = document.getElementById('orderPaymentFilterSelect')?.value || 'all';
+            const sortMode = document.getElementById('orderSortSelect')?.value || 'date_desc';
+
+            const tableRows = Array.from(document.querySelectorAll('.order-item-row'));
+            let visibleCount = 0;
+
+            tableRows.forEach(row => {
+                const id = (row.getAttribute('data-id') || '').toLowerCase();
+                const customer = (row.getAttribute('data-customer') || '').toLowerCase();
+                const userid = (row.getAttribute('data-userid') || '').toLowerCase();
+                const status = row.getAttribute('data-status') || '';
+                const payment = row.getAttribute('data-payment') || '';
+                const itemsStr = (row.getAttribute('data-items') || '').toLowerCase();
+
+                // Search Match
+                const matchSearch = search === '' || id.includes(search) || customer.includes(search) || userid.includes(search) || itemsStr.includes(search);
+
+                // Status Match
+                let matchStatus = true;
+                if (statusFilter === 'pending') {
+                    matchStatus = status.includes('รอ');
+                } else if (statusFilter !== 'all') {
+                    matchStatus = (status === statusFilter);
+                }
+
+                // Payment Match
+                let matchPayment = true;
+                if (paymentFilter === 'QR') {
+                    matchPayment = payment.includes('QR') || payment.includes('PromptPay') || payment.includes('สแกน');
+                } else if (paymentFilter === 'บัตร') {
+                    matchPayment = payment.includes('บัตร') || payment.includes('Card') || payment.includes('Credit');
+                } else if (paymentFilter === 'ปลายทาง') {
+                    matchPayment = payment.includes('ปลายทาง') || payment.includes('COD');
+                }
+
+                const show = matchSearch && matchStatus && matchPayment;
+                row.style.display = show ? '' : 'none';
+                if (show) visibleCount++;
+            });
+
+            // Sorting
+            const tableBody = document.getElementById('ordersTableBody');
+            if (tableBody) {
+                tableRows.sort((a, b) => {
+                    const dateA = a.getAttribute('data-date') || '';
+                    const dateB = b.getAttribute('data-date') || '';
+                    const amountA = parseFloat(a.getAttribute('data-amount') || 0);
+                    const amountB = parseFloat(b.getAttribute('data-amount') || 0);
+
+                    switch (sortMode) {
+                        case 'date_asc':
+                            return dateA.localeCompare(dateB);
+                        case 'amount_desc':
+                            return amountB - amountA;
+                        case 'amount_asc':
+                            return amountA - amountB;
+                        case 'date_desc':
+                        default:
+                            return dateB.localeCompare(dateA);
+                    }
+                }).forEach(row => tableBody.appendChild(row));
+            }
+
+            // Empty state display
+            const emptyState = document.getElementById('ordersEmptyState');
+            const tableView = document.getElementById('ordersTableView');
+            if (emptyState && tableView) {
+                if (visibleCount === 0) {
+                    emptyState.style.display = 'block';
+                    tableView.style.display = 'none';
+                } else {
+                    emptyState.style.display = 'none';
+                    tableView.style.display = 'block';
+                }
+            }
+
+            // Update Header Count
+            const headerCount = document.getElementById('orderHeaderCount');
+            if (headerCount) headerCount.innerText = `${visibleCount} รายการ`;
+        }
+
+        // Reset Orders Filter
+        function resetOrdersFilter() {
+            const searchInput = document.getElementById('orderSearchInput');
+            if (searchInput) searchInput.value = '';
+            const clearBtn = document.getElementById('clearOrderSearchBtn');
+            if (clearBtn) clearBtn.style.display = 'none';
+            const statusSelect = document.getElementById('orderStatusFilterSelect');
+            if (statusSelect) statusSelect.value = 'all';
+            const paySelect = document.getElementById('orderPaymentFilterSelect');
+            if (paySelect) paySelect.value = 'all';
+            const sortSelect = document.getElementById('orderSortSelect');
+            if (sortSelect) sortSelect.value = 'date_desc';
+
+            filterOrdersByKPI('all');
+        }
+
+        // Quick Set Order Status (Inline Row Dropdown / Actions)
+        async function quickSetOrderStatus(id, newStatus) {
+            try {
+                const fd = new FormData();
+                fd.append('action', 'update_order_status');
+                fd.append('id', id);
+                fd.append('status', newStatus);
+
+                const res = await fetch('admin_actions.php', { method: 'POST', body: fd });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    // Update Table Row Data & Badge
+                    const row = document.getElementById(`orderRow_${id}`);
+                    if (row) row.setAttribute('data-status', newStatus);
+
+                    let badgeHtml = '';
+                    if (newStatus === 'จัดส่งแล้ว') {
+                        badgeHtml = '<span class="badge badge-success"><i class="fa-solid fa-box-open"></i> จัดส่งแล้ว</span>';
+                    } else if (newStatus === 'กำลังจัดส่ง') {
+                        badgeHtml = '<span class="badge badge-shipping"><i class="fa-solid fa-truck-fast"></i> กำลังจัดส่ง</span>';
+                    } else if (newStatus === 'ชำระเงินแล้ว') {
+                        badgeHtml = '<span class="badge badge-info"><i class="fa-solid fa-circle-check"></i> ชำระเงินแล้ว</span>';
+                    } else if (newStatus === 'ยกเลิก') {
+                        badgeHtml = '<span class="badge badge-danger"><i class="fa-solid fa-ban"></i> ยกเลิก</span>';
+                    } else if (newStatus === 'รอเก็บเงินปลายทาง') {
+                        badgeHtml = '<span class="badge badge-warning"><i class="fa-solid fa-hand-holding-dollar"></i> รอเก็บเงินปลายทาง</span>';
+                    } else {
+                        badgeHtml = '<span class="badge badge-warning"><i class="fa-solid fa-clock"></i> รอชำระเงิน</span>';
+                    }
+
+                    const badgeEl = document.getElementById(`orderStatusBadge_${id}`);
+                    if (badgeEl) badgeEl.innerHTML = badgeHtml;
+
+                    const selectEl = document.getElementById(`orderStatusSelect_${id}`);
+                    if (selectEl) selectEl.value = newStatus;
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: data.message || `อัปเดตสถานะเป็น '${newStatus}' สำเร็จ`,
+                        toast: true,
+                        position: 'top-end',
+                        showConfirmButton: false,
+                        timer: 1600
+                    });
+                } else {
+                    Swal.fire('ข้อผิดพลาด', data.message, 'error');
+                }
+            } catch (err) {
+                Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
             }
         }
 
-        // Delete Order
+        // Backwards compatibility alias
+        function updateOrderStatus(id, status) {
+            quickSetOrderStatus(id, status);
+        }
+
+        // Open Order Receipt Modal
+        function openOrderReceiptModal(id) {
+            const row = document.getElementById(`orderRow_${id}`);
+            if (!row) return;
+
+            const ord = JSON.parse(row.getAttribute('data-json'));
+            currentReceiptOrderId = id;
+
+            document.getElementById('rcptOrderId').innerText = `#${ord.id}`;
+            document.getElementById('rcptOrderDate').innerText = `วันที่สั่งซื้อ: ${ord.order_date}`;
+            document.getElementById('rcptCustomerName').innerText = ord.user_name || 'ลูกค้าทั่วไป';
+            document.getElementById('rcptUserId').innerText = ord.user_id || '-';
+            document.getElementById('rcptPaymentMethod').innerText = ord.payment_method || 'สแกน QR Code';
+
+            // Status in receipt
+            let badgeHtml = '';
+            if (ord.status === 'จัดส่งแล้ว') {
+                badgeHtml = '<span class="badge badge-success"><i class="fa-solid fa-box-open"></i> จัดส่งแล้ว</span>';
+            } else if (ord.status === 'กำลังจัดส่ง') {
+                badgeHtml = '<span class="badge badge-shipping"><i class="fa-solid fa-truck-fast"></i> กำลังจัดส่ง</span>';
+            } else if (ord.status === 'ชำระเงินแล้ว') {
+                badgeHtml = '<span class="badge badge-info"><i class="fa-solid fa-circle-check"></i> ชำระเงินแล้ว</span>';
+            } else if (ord.status === 'ยกเลิก') {
+                badgeHtml = '<span class="badge badge-danger"><i class="fa-solid fa-ban"></i> ยกเลิก</span>';
+            } else if (ord.status === 'รอเก็บเงินปลายทาง') {
+                badgeHtml = '<span class="badge badge-warning"><i class="fa-solid fa-hand-holding-dollar"></i> รอเก็บเงินปลายทาง</span>';
+            } else {
+                badgeHtml = '<span class="badge badge-warning"><i class="fa-solid fa-clock"></i> รอชำระเงิน</span>';
+            }
+            document.getElementById('rcptStatusBadge').innerHTML = badgeHtml;
+            document.getElementById('rcptStatusSelect').value = ord.status;
+
+            // Render Items
+            let items = [];
+            try {
+                items = JSON.parse(ord.items_detail);
+            } catch(e) {
+                items = [];
+            }
+
+            let itemsHtml = '';
+            let subtotal = 0;
+            if (Array.isArray(items) && items.length > 0) {
+                items.forEach(it => {
+                    const qty = parseInt(it.quantity || 1);
+                    const price = parseFloat(it.price || 0);
+                    const lineTotal = qty * price;
+                    subtotal += lineTotal;
+                    itemsHtml += `
+                    <tr>
+                        <td>
+                            <div style="font-weight:600; color:var(--text-main); font-size:0.9rem;">${escapeHtml(it.title || 'หนังสือ')}</div>
+                            <div style="font-size:0.75rem; color:var(--text-muted);">รหัส: ${escapeHtml(it.id || '-')}</div>
+                        </td>
+                        <td style="text-align:center; font-weight:700;">×${qty}</td>
+                        <td style="text-align:right;">฿${price.toFixed(2)}</td>
+                        <td style="text-align:right; font-weight:700; color:var(--primary-dark);">฿${lineTotal.toFixed(2)}</td>
+                    </tr>`;
+                });
+            } else {
+                itemsHtml = '<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:1rem;">(ไม่มีรายละเอียดสินค้า)</td></tr>';
+                subtotal = parseFloat(ord.total_amount || 0);
+            }
+
+            document.getElementById('rcptItemsTableBody').innerHTML = itemsHtml;
+            document.getElementById('rcptSubtotal').innerText = `฿${subtotal.toFixed(2)}`;
+            document.getElementById('rcptGrandTotal').innerText = `฿${parseFloat(ord.total_amount || subtotal).toFixed(2)}`;
+
+            document.getElementById('orderReceiptModal').classList.add('active');
+        }
+
+        function closeOrderReceiptModal() {
+            document.getElementById('orderReceiptModal').classList.remove('active');
+        }
+
+        function updateOrderStatusFromModal(newStatus) {
+            if (!currentReceiptOrderId) return;
+            quickSetOrderStatus(currentReceiptOrderId, newStatus);
+            
+            let badgeHtml = '';
+            if (newStatus === 'จัดส่งแล้ว') {
+                badgeHtml = '<span class="badge badge-success"><i class="fa-solid fa-box-open"></i> จัดส่งแล้ว</span>';
+            } else if (newStatus === 'กำลังจัดส่ง') {
+                badgeHtml = '<span class="badge badge-shipping"><i class="fa-solid fa-truck-fast"></i> กำลังจัดส่ง</span>';
+            } else if (newStatus === 'ชำระเงินแล้ว') {
+                badgeHtml = '<span class="badge badge-info"><i class="fa-solid fa-circle-check"></i> ชำระเงินแล้ว</span>';
+            } else if (newStatus === 'ยกเลิก') {
+                badgeHtml = '<span class="badge badge-danger"><i class="fa-solid fa-ban"></i> ยกเลิก</span>';
+            } else if (newStatus === 'รอเก็บเงินปลายทาง') {
+                badgeHtml = '<span class="badge badge-warning"><i class="fa-solid fa-hand-holding-dollar"></i> รอเก็บเงินปลายทาง</span>';
+            } else {
+                badgeHtml = '<span class="badge badge-warning"><i class="fa-solid fa-clock"></i> รอชำระเงิน</span>';
+            }
+            document.getElementById('rcptStatusBadge').innerHTML = badgeHtml;
+        }
+
+        // Print Order Receipt Function
+        function printOrderReceipt() {
+            const content = document.getElementById('printableReceiptArea').innerHTML;
+            const printWin = window.open('', '_blank', 'width=750,height=850');
+            printWin.document.write(`
+                <!DOCTYPE html>
+                <html lang="th">
+                <head>
+                    <meta charset="UTF-8">
+                    <title>ใบเสร็จคำสั่งซื้อ - CaffeBook</title>
+                    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+                    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+                    <style>
+                        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Prompt', 'Outfit', sans-serif; }
+                        body { background: white; color: #2C2523; padding: 25px; }
+                        .receipt-container { max-width: 650px; margin: 0 auto; border: 1.5px solid #EAD8C7; border-radius: 12px; padding: 24px; }
+                        .receipt-header-row { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px dashed #D6C7B2; padding-bottom: 14px; margin-bottom: 16px; }
+                        .receipt-meta-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; background: #FAF8F5; padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #EAE3D9; }
+                        .receipt-meta-item .lbl { font-size: 0.75rem; color: #7A726D; margin-bottom: 2px; }
+                        .receipt-meta-item .val { font-size: 0.9rem; font-weight: 700; color: #2C2523; }
+                        .receipt-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+                        .receipt-table th { background: #FAF5EE; padding: 9px 12px; font-size: 0.82rem; color: #7A726D; text-align: left; border-bottom: 1px solid #EAE3D9; }
+                        .receipt-table td { padding: 9px 12px; font-size: 0.88rem; border-bottom: 1px solid #F3EDE4; }
+                        .receipt-summary-box { background: #FAF8F5; padding: 14px; border-radius: 8px; border: 1px solid #EAE3D9; }
+                        .receipt-sum-row { display: flex; justify-content: space-between; font-size: 0.88rem; color: #7A726D; margin-bottom: 4px; }
+                        .receipt-sum-row.total { font-size: 1.2rem; font-weight: 800; color: #6F4E37; border-top: 1.5px dashed #EAD8C7; padding-top: 8px; margin-top: 4px; }
+                        .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; }
+                        .badge-success { background: #E8F8F0; color: #27AE60; }
+                        .badge-info { background: #EBF5FB; color: #2980B9; }
+                        .badge-warning { background: #FEF5E7; color: #D35400; }
+                        .badge-danger { background: #FDEDEC; color: #E74C3C; }
+                        .badge-shipping { background: #F3E5F5; color: #8E24AA; }
+                        @media print {
+                            body { padding: 0; }
+                            .receipt-container { border: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="receipt-container">${content}</div>
+                    <script>
+                        window.onload = () => {
+                            window.focus();
+                            window.print();
+                        };
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWin.document.close();
+        }
+
+        // Floating Bulk Orders Action Logic
+        function handleOrderSelectChange() {
+            const selected = document.querySelectorAll('.order-select-chk:checked');
+            const bulkBar = document.getElementById('bulkOrdersBar');
+            const countBadge = document.getElementById('bulkOrdersSelectedCount');
+
+            if (selected.length > 0) {
+                if (countBadge) countBadge.innerText = `${selected.length} รายการ`;
+                if (bulkBar) bulkBar.classList.add('active');
+            } else {
+                if (bulkBar) bulkBar.classList.remove('active');
+                const master = document.getElementById('selectAllOrders');
+                if (master) master.checked = false;
+            }
+        }
+
+        function toggleSelectAllOrders(masterChk) {
+            const chks = document.querySelectorAll('.order-select-chk');
+            chks.forEach(c => {
+                const row = c.closest('.order-item-row');
+                if (row && row.style.display !== 'none') {
+                    c.checked = masterChk.checked;
+                }
+            });
+            handleOrderSelectChange();
+        }
+
+        function clearBulkOrdersSelection() {
+            document.querySelectorAll('.order-select-chk').forEach(c => c.checked = false);
+            const master = document.getElementById('selectAllOrders');
+            if (master) master.checked = false;
+            handleOrderSelectChange();
+        }
+
+        function getSelectedOrderIds() {
+            return Array.from(document.querySelectorAll('.order-select-chk:checked')).map(c => c.value);
+        }
+
+        // Bulk Update Orders Status
+        function bulkUpdateOrdersStatusModal(status) {
+            const ids = getSelectedOrderIds();
+            if (ids.length === 0) return;
+
+            Swal.fire({
+                title: `เปลี่ยนสถานะ ${ids.length} ออเดอร์?`,
+                text: `คุณต้องการเปลี่ยนสถานะของคำสั่งซื้อที่เลือกทั้งหมดเป็น "${status}" หรือไม่?`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#6F4E37',
+                cancelButtonColor: '#7A726D',
+                confirmButtonText: 'ใช่, อัปเดตเลย',
+                cancelButtonText: 'ยกเลิก'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const fd = new FormData();
+                    fd.append('action', 'bulk_update_order_status');
+                    fd.append('ids', JSON.stringify(ids));
+                    fd.append('status', status);
+
+                    const res = await fetch('admin_actions.php', { method: 'POST', body: fd });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        Swal.fire('สำเร็จ', data.message, 'success').then(() => location.reload());
+                    } else {
+                        Swal.fire('ข้อผิดพลาด', data.message, 'error');
+                    }
+                }
+            });
+        }
+
+        // Bulk Delete Orders
+        function bulkDeleteSelectedOrders() {
+            const ids = getSelectedOrderIds();
+            if (ids.length === 0) return;
+
+            Swal.fire({
+                title: `ยืนยันการลบ ${ids.length} คำสั่งซื้อ?`,
+                text: 'การลบนี้จะไม่สามารถเรียกคืนได้',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#E74C3C',
+                cancelButtonColor: '#6F4E37',
+                confirmButtonText: `ใช่, ลบ ${ids.length} รายการ`,
+                cancelButtonText: 'ยกเลิก'
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const fd = new FormData();
+                    fd.append('action', 'bulk_delete_orders');
+                    fd.append('ids', JSON.stringify(ids));
+
+                    const res = await fetch('admin_actions.php', { method: 'POST', body: fd });
+                    const data = await res.json();
+                    if (data.status === 'success') {
+                        Swal.fire('ลบสำเร็จ', data.message, 'success').then(() => location.reload());
+                    } else {
+                        Swal.fire('ข้อผิดพลาด', data.message, 'error');
+                    }
+                }
+            });
+        }
+
+        // Quick Add Sample Order
+        async function quickAddSampleOrder() {
+            try {
+                Swal.fire({
+                    title: 'กำลังสุ่มสร้างคำสั่งซื้อจำลอง...',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+
+                const fd = new FormData();
+                fd.append('action', 'quick_add_sample_order');
+
+                const res = await fetch('admin_actions.php', { method: 'POST', body: fd });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'สำเร็จ!',
+                        text: data.message,
+                        timer: 1500,
+                        showConfirmButton: false
+                    }).then(() => location.reload());
+                } else {
+                    Swal.fire('ข้อผิดพลาด', data.message, 'error');
+                }
+            } catch (err) {
+                Swal.fire('ข้อผิดพลาด', 'ไม่สามารถสร้างออเดอร์ตัวอย่างได้', 'error');
+            }
+        }
+
+        // Delete Single Order
         function deleteOrder(id) {
             Swal.fire({
                 title: 'ยืนยันการลบออเดอร์?',

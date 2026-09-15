@@ -145,6 +145,45 @@ try {
             ]);
             break;
 
+        case 'update_price':
+            $id = trim($_POST['id'] ?? '');
+            $price = floatval($_POST['price'] ?? 0);
+            if (empty($id) || $price <= 0) {
+                echo json_encode(['status' => 'error', 'message' => 'กรุณาระบุราคาที่ถูกต้อง']);
+                exit;
+            }
+            $stmt = $pdo->prepare("UPDATE books SET price = ? WHERE id = ?");
+            $stmt->execute([$price, $id]);
+            echo json_encode(['status' => 'success', 'price' => $price, 'message' => 'อัปเดตราคาสำเร็จ ฿' . number_format($price, 2)]);
+            break;
+
+        case 'update_category':
+            $id = trim($_POST['id'] ?? '');
+            $category = trim($_POST['category'] ?? '');
+            if (empty($id) || empty($category)) {
+                echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ครบถ้วน']);
+                exit;
+            }
+            $stmt = $pdo->prepare("UPDATE books SET category = ? WHERE id = ?");
+            $stmt->execute([$category, $id]);
+            echo json_encode(['status' => 'success', 'category' => $category, 'message' => "เปลี่ยนหมวดหมู่เป็น '{$category}' สำเร็จ"]);
+            break;
+
+        case 'quick_add_sample':
+            $samples = [
+                ['title' => 'กาแฟกับหนังสือ: ศิลปะแห่งการใช้ชีวิตช้าๆ', 'author' => 'CaffeBook Studio', 'price' => 280, 'stock' => 25, 'category' => 'พัฒนาตนเอง', 'cover' => 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500', 'desc' => 'เรื่องราวความสุขง่ายๆ ในร้านกาแฟและหนังสือดีๆ สักเล่ม'],
+                ['title' => 'Deep Work พลังแห่งการจดจ่อ', 'author' => 'Cal Newport', 'price' => 320, 'stock' => 18, 'category' => 'ธุรกิจ/บริหาร', 'cover' => 'https://images.unsplash.com/photo-1592496431122-2349e0fbc666?w=500', 'desc' => 'วิธีฝึกสมาธิในการทำงานขั้นสูงเพื่อสร้างสรรค์ผลงานที่ยอดเยี่ยม'],
+                ['title' => 'มหัศจรรย์ร้านหนังสือยามค่ำคืน', 'author' => 'Aoi Morita', 'price' => 265, 'stock' => 30, 'category' => 'นิยาย', 'cover' => 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=500', 'desc' => 'เรื่องราวอบอุ่นหัวใจของร้านหนังสือเปิดเฉพาะหลังเที่ยงคืน'],
+                ['title' => 'เจ้าชายน้อย (The Little Prince)', 'author' => 'Antoine de Saint-Exupéry', 'price' => 195, 'stock' => 40, 'category' => 'วรรณกรรม', 'cover' => 'https://images.unsplash.com/photo-1543002588-bfa74002ed7e?w=500', 'desc' => 'วรรณกรรมเยาวชนคลาสสิกระดับโลกแปลกใหม่ที่ครองใจคนทั่วโลก'],
+                ['title' => 'Demon Slayer: คิมัตสึ โนะ ไอยบะ', 'author' => 'Koyoharu Gotouge', 'price' => 95, 'stock' => 50, 'category' => 'การ์ตูน/มังงะ', 'cover' => 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=500', 'desc' => 'การเดินทางต่อสู้กับเหล่าอสูรของทันจิโร่เพื่อช่วยเหลือน้องสาว']
+            ];
+            $sample = $samples[array_rand($samples)];
+            $id = 'b_' . uniqid();
+            $stmt = $pdo->prepare("INSERT INTO books (id, title, author, price, stock, category, cover_url, description, rating, pages, is_featured) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$id, $sample['title'], $sample['author'], $sample['price'], $sample['stock'], $sample['category'], cleanCoverUrlInternal($sample['cover']), $sample['desc'], 4.9, 240, 1]);
+            echo json_encode(['status' => 'success', 'message' => "เพิ่มสินค้าตัวอย่าง '{$sample['title']}' เรียบร้อยแล้ว!"]);
+            break;
+
         case 'duplicate_book':
             $id = trim($_POST['id'] ?? '');
             if (empty($id)) {
@@ -216,7 +255,22 @@ try {
             }
             $stmt = $pdo->prepare("UPDATE orders SET status = ? WHERE id = ?");
             $stmt->execute([$status, $id]);
-            echo json_encode(['status' => 'success', 'message' => 'อัปเดตสถานะออเดอร์เรียบร้อยแล้ว']);
+            echo json_encode(['status' => 'success', 'status_val' => $status, 'message' => "อัปเดตสถานะออเดอร์ #{$id} เป็น '{$status}' เรียบร้อยแล้ว"]);
+            break;
+
+        case 'bulk_update_order_status':
+            $ids = json_decode($_POST['ids'] ?? '[]', true);
+            $status = trim($_POST['status'] ?? '');
+            if (empty($ids) || !is_array($ids) || empty($status)) {
+                echo json_encode(['status' => 'error', 'message' => 'ข้อมูลไม่ครบถ้วน']);
+                exit;
+            }
+            $inQuery = implode(',', array_fill(0, count($ids), '?'));
+            $params = array_merge([$status], $ids);
+            $stmt = $pdo->prepare("UPDATE orders SET status = ? WHERE id IN ($inQuery)");
+            $stmt->execute($params);
+            $count = count($ids);
+            echo json_encode(['status' => 'success', 'message' => "เปลี่ยนสถานะคำสั่งซื้อ {$count} รายการเป็น '{$status}' เรียบร้อยแล้ว"]);
             break;
 
         case 'delete_order':
@@ -227,7 +281,68 @@ try {
             }
             $stmt = $pdo->prepare("DELETE FROM orders WHERE id = ?");
             $stmt->execute([$id]);
-            echo json_encode(['status' => 'success', 'message' => 'ลบรายการสั่งซื้อเรียบร้อยแล้ว']);
+            echo json_encode(['status' => 'success', 'message' => "ลบรายการสั่งซื้อ #{$id} เรียบร้อยแล้ว"]);
+            break;
+
+        case 'bulk_delete_orders':
+            $ids = json_decode($_POST['ids'] ?? '[]', true);
+            if (empty($ids) || !is_array($ids)) {
+                echo json_encode(['status' => 'error', 'message' => 'ไม่มีรายการที่เลือก']);
+                exit;
+            }
+            $inQuery = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $pdo->prepare("DELETE FROM orders WHERE id IN ($inQuery)");
+            $stmt->execute($ids);
+            $count = count($ids);
+            echo json_encode(['status' => 'success', 'message' => "ลบคำสั่งซื้อที่เลือกจำนวน {$count} รายการเรียบร้อยแล้ว"]);
+            break;
+
+        case 'quick_add_sample_order':
+            $bStmt = $pdo->query("SELECT id, title, price, cover_url FROM books LIMIT 3");
+            $sampleBooks = $bStmt->fetchAll();
+            if (empty($sampleBooks)) {
+                echo json_encode(['status' => 'error', 'message' => 'ไม่มีหนังสือในคลัง กรุณาเพิ่มหนังสือก่อน']);
+                exit;
+            }
+            $orderId = 'CB-' . rand(100000, 999999);
+            $customerNames = ['คุณสมชาย รักษ์ดี', 'คุณกนกวรรณ จันทร์เพ็ญ', 'คุณเอกชัย ศิริสุข', 'คุณศิริพร สว่างจิต', 'คุณธนพล มั่งคั่ง', 'Safe User'];
+            $custName = $customerNames[array_rand($customerNames)];
+            $payments = ['สแกน QR Code', 'บัตรเครดิต/เดบิต', 'เก็บเงินปลายทาง'];
+            $payMethod = $payments[array_rand($payments)];
+            $statuses = ['รอชำระเงิน', 'ชำระเงินแล้ว', 'กำลังจัดส่ง'];
+            $initStatus = ($payMethod === 'เก็บเงินปลายทาง') ? 'รอเก็บเงินปลายทาง' : $statuses[array_rand($statuses)];
+
+            $orderItems = [];
+            $totalAmount = 0;
+            // pick 1-2 random books
+            $pickCount = min(count($sampleBooks), rand(1, 2));
+            shuffle($sampleBooks);
+            for ($i = 0; $i < $pickCount; $i++) {
+                $sb = $sampleBooks[$i];
+                $qty = rand(1, 2);
+                $orderItems[] = [
+                    'id' => $sb['id'],
+                    'title' => $sb['title'],
+                    'price' => (float)$sb['price'],
+                    'quantity' => $qty,
+                    'cover_url' => $sb['cover_url']
+                ];
+                $totalAmount += $qty * (float)$sb['price'];
+            }
+
+            $stmt = $pdo->prepare("INSERT INTO orders (id, user_id, user_name, total_amount, status, payment_method, items_detail, order_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([
+                $orderId,
+                'usr_customer',
+                $custName,
+                $totalAmount,
+                $initStatus,
+                $payMethod,
+                json_encode($orderItems, JSON_UNESCAPED_UNICODE),
+                date('Y-m-d H:i:s')
+            ]);
+
+            echo json_encode(['status' => 'success', 'message' => "สร้างคำสั่งซื้อตัวอย่าง #{$orderId} ยอดรวม ฿" . number_format($totalAmount, 2) . " สำเร็จ!"]);
             break;
 
         // --- USERS ACTIONS ---

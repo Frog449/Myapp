@@ -62,7 +62,7 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> checkout(String userId, String userName) async {
+  Future<bool> checkout(String userId, String userName, {String paymentMethod = 'สแกน QR Code'}) async {
     if (_items.isEmpty) return false;
 
     final itemList = _items.values.map((item) {
@@ -78,6 +78,7 @@ class CartProvider extends ChangeNotifier {
       userId: userId,
       userName: userName,
       totalAmount: totalAmount,
+      paymentMethod: paymentMethod,
       items: itemList,
     );
 

@@ -124,6 +124,7 @@ try {
                 user_name TEXT NOT NULL,
                 total_amount REAL NOT NULL DEFAULT 0.00,
                 status TEXT NOT NULL DEFAULT 'ชำระเงินแล้ว',
+                payment_method TEXT NOT NULL DEFAULT 'สแกน QR Code',
                 items_detail TEXT,
                 order_date TEXT NOT NULL
             );
@@ -159,18 +160,26 @@ try {
                 `user_name` VARCHAR(255) NOT NULL,
                 `total_amount` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
                 `status` VARCHAR(50) NOT NULL DEFAULT 'ชำระเงินแล้ว',
+                `payment_method` VARCHAR(50) NOT NULL DEFAULT 'สแกน QR Code',
                 `items_detail` TEXT,
                 `order_date` VARCHAR(50) NOT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         ");
     }
 
-    // Auto-migrate: Ensure items_detail column exists in orders table
+    // Auto-migrate: Ensure items_detail and payment_method columns exist in orders table
     try {
         $pdo->query("SELECT items_detail FROM orders LIMIT 1");
     } catch (\Exception $colEx) {
         try {
             $pdo->exec("ALTER TABLE orders ADD COLUMN items_detail TEXT");
+        } catch (\Exception $ignored) {}
+    }
+    try {
+        $pdo->query("SELECT payment_method FROM orders LIMIT 1");
+    } catch (\Exception $pmEx) {
+        try {
+            $pdo->exec("ALTER TABLE orders ADD COLUMN payment_method VARCHAR(50) DEFAULT 'สแกน QR Code'");
         } catch (\Exception $ignored) {}
     }
 
@@ -190,8 +199,8 @@ try {
     $orderCount = (int)$pdo->query("SELECT COUNT(*) FROM orders")->fetchColumn();
     if ($orderCount === 0) {
         $ordSql = (strtolower($dbDriver) === 'sqlite')
-            ? "INSERT OR IGNORE INTO orders (id, user_id, user_name, total_amount, status, items_detail, order_date) VALUES (?, ?, ?, ?, ?, ?, ?)"
-            : "INSERT IGNORE INTO orders (id, user_id, user_name, total_amount, status, items_detail, order_date) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            ? "INSERT OR IGNORE INTO orders (id, user_id, user_name, total_amount, status, payment_method, items_detail, order_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            : "INSERT IGNORE INTO orders (id, user_id, user_name, total_amount, status, payment_method, items_detail, order_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         
         $ordStmt = $pdo->prepare($ordSql);
         
@@ -203,8 +212,8 @@ try {
             ['id' => 'b_6a9672e44c922', 'title' => 'THE LITTLE FROG’S GUIDE TO SELF-CARE', 'price' => 295.0, 'quantity' => 1]
         ], JSON_UNESCAPED_UNICODE);
 
-        $ordStmt->execute(['ord_001', 'usr_demo', 'สมชาย ใจดี', 590.00, 'จัดส่งแล้ว', $sampleItems1, date('Y-m-d H:i', strtotime('-2 days'))]);
-        $ordStmt->execute(['ord_002', 'usr_demo', 'สมชาย ใจดี', 295.00, 'ชำระเงินแล้ว', $sampleItems2, date('Y-m-d H:i')]);
+        $ordStmt->execute(['ord_001', 'usr_demo', 'สมชาย ใจดี', 590.00, 'จัดส่งแล้ว', 'สแกน QR Code', $sampleItems1, date('Y-m-d H:i', strtotime('-2 days'))]);
+        $ordStmt->execute(['ord_002', 'usr_demo', 'สมชาย ใจดี', 295.00, 'รอเก็บเงินปลายทาง', 'เก็บเงินปลายทาง', $sampleItems2, date('Y-m-d H:i')]);
     }
 
     // 5. Auto-seed 15 Books Catalog if empty or less than 10 books

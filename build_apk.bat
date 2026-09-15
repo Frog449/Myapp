@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 chcp 65001 >nul
 title CaffeBook - Android APK Builder
 
@@ -27,10 +27,11 @@ if %errorlevel% neq 0 (
     )
 )
 
-echo [1/3] กำลังเตรียมแพ็กเกจ (flutter pub get)...
+echo [1/3] กำลังเตรียมแพ็กเกจและไอคอนแอพ...
 call %FLUTTER_CMD% pub get
+call %FLUTTER_CMD% pub run flutter_launcher_icons
 if %errorlevel% neq 0 (
-    echo [ERROR] ไม่สามารถดาวน์โหลด Dependencies ได้
+    echo [ERROR] ไม่สามารถเตรียมแพ็กเกจหรือไอคอนได้
     pause
     exit /b 1
 )

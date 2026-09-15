@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../constants/brand_assets.dart';
 import '../../models/book.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/book_provider.dart';
@@ -394,18 +395,29 @@ class StorefrontScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 24),
                 Container(
-                  padding: const EdgeInsets.all(22),
+                  padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(22),
                     border: Border.all(color: Colors.white24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.25),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                  child: const Column(
+                  child: Column(
                     children: [
-                      Icon(Icons.auto_stories_rounded, size: 48, color: CafeTheme.accentGold),
-                      SizedBox(height: 8),
-                      Text('CaffeBook Select', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                      Text('คัดสรรหนังสือระดับพรีเมียม', style: TextStyle(color: CafeTheme.latteCream, fontSize: 11)),
+                      BrandAssets.buildLogoImage(
+                        width: 64,
+                        height: 64,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text('CaffeBook Select', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                      const Text('คัดสรรหนังสือระดับพรีเมียม', style: TextStyle(color: CafeTheme.latteCream, fontSize: 11)),
                     ],
                   ),
                 ),

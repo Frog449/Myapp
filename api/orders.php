@@ -23,7 +23,8 @@ if ($method === 'POST') {
     $user_id = trim($data['user_id'] ?? 'usr_guest');
     $user_name = trim($data['user_name'] ?? 'ลูกค้าทั่วไป');
     $total_amount = floatval($data['total_amount'] ?? 0);
-    $status = 'ชำระเงินแล้ว';
+    $payment_method = trim($data['payment_method'] ?? 'สแกน QR Code');
+    $status = ($payment_method === 'เก็บเงินปลายทาง') ? 'รอเก็บเงินปลายทาง' : 'ชำระเงินแล้ว';
     $order_date = date('Y-m-d H:i');
     
     // Process items detail
@@ -40,8 +41,8 @@ if ($method === 'POST') {
         exit();
     }
 
-    $stmt = $pdo->prepare("INSERT INTO orders (id, user_id, user_name, total_amount, status, items_detail, order_date) VALUES (?, ?, ?, ?, ?, ?, ?)");
-    $success = $stmt->execute([$id, $user_id, $user_name, $total_amount, $status, $items_detail, $order_date]);
+    $stmt = $pdo->prepare("INSERT INTO orders (id, user_id, user_name, total_amount, status, payment_method, items_detail, order_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    $success = $stmt->execute([$id, $user_id, $user_name, $total_amount, $status, $payment_method, $items_detail, $order_date]);
 
     // Stock update in database
     if (is_array($items)) {

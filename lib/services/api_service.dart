@@ -172,6 +172,7 @@ class ApiService {
     required String userId,
     required String userName,
     required double totalAmount,
+    String paymentMethod = 'สแกน QR Code',
     required List<Map<String, dynamic>> items,
   }) async {
     final response = await http.post(
@@ -181,6 +182,7 @@ class ApiService {
         'user_id': userId,
         'user_name': userName,
         'total_amount': totalAmount,
+        'payment_method': paymentMethod,
         'items': items,
       }),
     );

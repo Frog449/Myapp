@@ -35,6 +35,7 @@ class BookOrder {
   final String userId;
   final String userName;
   final double totalAmount;
+  final String paymentMethod;
   final String status;
   final String itemsDetail;
   final String orderDate;
@@ -44,6 +45,7 @@ class BookOrder {
     required this.userId,
     required this.userName,
     required this.totalAmount,
+    this.paymentMethod = 'สแกน QR Code',
     required this.status,
     this.itemsDetail = '',
     required this.orderDate,
@@ -72,6 +74,7 @@ class BookOrder {
       userId: json['user_id']?.toString() ?? '',
       userName: json['user_name']?.toString() ?? '',
       totalAmount: double.tryParse(json['total_amount']?.toString() ?? '0') ?? 0.0,
+      paymentMethod: json['payment_method']?.toString() ?? 'สแกน QR Code',
       status: json['status']?.toString() ?? 'ชำระเงินแล้ว',
       itemsDetail: json['items_detail']?.toString() ?? '',
       orderDate: json['order_date']?.toString() ?? '',
@@ -84,6 +87,7 @@ class BookOrder {
       'user_id': userId,
       'user_name': userName,
       'total_amount': totalAmount,
+      'payment_method': paymentMethod,
       'status': status,
       'items_detail': itemsDetail,
       'order_date': orderDate,
