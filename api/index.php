@@ -3211,75 +3211,350 @@ function renderOrderStatusBadge($status) {
                 </div>
             </section>
 
-            <!-- TAB 5: API INFO -->
+            <!-- TAB 5: API & SYSTEM ARCHITECTURE INFO -->
             <section id="tab-api-info" class="tab-section">
                 <div class="content-card">
-                    <h2 class="card-title" style="margin-bottom: 1rem;"><i class="fa-solid fa-code"></i> ข้อมูล REST API สำหรับ Flutter Application</h2>
-                    <p style="color: var(--text-muted); margin-bottom: 1.4rem;">
-                        Backend ให้บริการทั้ง Web Dashboard และ REST API ผ่านพอร์ตเดียวกัน (<code>http://127.0.0.1:8000</code>) โดยแอป Flutter สามารถเรียกใช้งาน API ได้ดังนี้:
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <i class="fa-solid fa-network-wired"></i> 
+                            <span>ข้อมูลการเชื่อมต่อและสถาปัตยกรรมระบบ (System Architecture & REST API)</span>
+                        </h2>
+                        <div class="card-actions">
+                            <a href="download_apk.php" class="btn btn-secondary btn-sm">
+                                <i class="fa-solid fa-mobile-screen-button"></i> โหลดแอป APK มือถือ
+                            </a>
+                        </div>
+                    </div>
+
+                    <p style="color: var(--text-muted); margin-bottom: 1.4rem; font-size: 0.92rem;">
+                        ระบบ <b>CaffeBook</b> ทำงานด้วยสถาปัตยกรรมแบบแยกส่วน (Decoupled Full-Stack Architecture) โดย Backend ให้บริการทั้ง Web Dashboard และ REST API ผ่านพอร์ตเดียวกัน และเชื่อมต่อฐานข้อมูล TiDB Cloud แบบเรียลไทม์:
                     </p>
 
-                    <div class="table-responsive">
+                    <!-- 4 Architecture Tech Stack Cards -->
+                    <div class="arch-grid">
+                        <div class="arch-card">
+                            <div class="arch-card-header">
+                                <div class="arch-icon client"><i class="fa-solid fa-mobile-screen"></i></div>
+                                <div>
+                                    <div class="arch-title">📱 ฝั่ง Client (ผู้ใช้)</div>
+                                    <div class="arch-subtitle">Flutter Cross-Platform</div>
+                                </div>
+                            </div>
+                            <div class="arch-body">
+                                แอปพลิเคชันเขียนด้วย <b>Flutter (Dart 3.x)</b> รองรับทั้ง Android (APK), iOS, Windows Desktop, macOS และ Web
+                            </div>
+                            <div class="arch-tags">
+                                <span class="arch-tag">Flutter 3.24</span>
+                                <span class="arch-tag">Dart</span>
+                                <span class="arch-tag">Provider State</span>
+                            </div>
+                        </div>
+
+                        <div class="arch-card">
+                            <div class="arch-card-header">
+                                <div class="arch-icon server"><i class="fa-solid fa-server"></i></div>
+                                <div>
+                                    <div class="arch-title">☕ ฝั่ง Backend API</div>
+                                    <div class="arch-subtitle">PHP 8.x + Web Admin</div>
+                                </div>
+                            </div>
+                            <div class="arch-body">
+                                ให้บริการ REST API ประมวลผลรวดเร็ว จัดการออเดอร์ สต็อก และยืนยันตัวตน พร้อม Dashboard บริหารจัดการหลังบ้าน
+                            </div>
+                            <div class="arch-tags">
+                                <span class="arch-tag">PHP 8.3</span>
+                                <span class="arch-tag">REST API</span>
+                                <span class="arch-tag">CORS Enabled</span>
+                            </div>
+                        </div>
+
+                        <div class="arch-card">
+                            <div class="arch-card-header">
+                                <div class="arch-icon db"><i class="fa-solid fa-database"></i></div>
+                                <div>
+                                    <div class="arch-title">☁️ ฝั่ง Database</div>
+                                    <div class="arch-subtitle">TiDB Cloud / MySQL</div>
+                                </div>
+                            </div>
+                            <div class="arch-body">
+                                ฐานข้อมูลคลาวด์ <b>TiDB Cloud Serverless</b> (MySQL Protocol Port 4000) รองรับการขยายตัวและเข้าถึงจากทั่วโลก
+                            </div>
+                            <div class="arch-tags">
+                                <span class="arch-tag">TiDB Cloud</span>
+                                <span class="arch-tag">PDO MySQL</span>
+                                <span class="arch-tag">UTF8MB4</span>
+                            </div>
+                        </div>
+
+                        <div class="arch-card">
+                            <div class="arch-card-header">
+                                <div class="arch-icon proto"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
+                                <div>
+                                    <div class="arch-title">⚡ โปรโตคอล & ข้อมูล</div>
+                                    <div class="arch-subtitle">HTTP/HTTPS + JSON</div>
+                                </div>
+                            </div>
+                            <div class="arch-body">
+                                แลกเปลี่ยนข้อมูลด้วยรูปแบบ <b>JSON</b> มาตรฐาน เข้ารหัส UTF-8 ปลอดภัย และตอบสนองเร็วด้วย Async HTTP
+                            </div>
+                            <div class="arch-tags">
+                                <span class="arch-tag">application/json</span>
+                                <span class="arch-tag">RESTful</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Connection Endpoint Box -->
+                    <div style="background: #FAF7F2; border: 1.5px dashed #D6C7B2; border-radius: 12px; padding: 14px 18px; margin-bottom: 1.8rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 0.92rem; color: var(--primary-dark);">
+                                <i class="fa-solid fa-link" style="color:var(--primary);"></i> Base URL การเชื่อมต่อ API ในปัจจุบัน:
+                            </div>
+                            <div style="margin-top: 4px;">
+                                <code style="background: white; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border-color); font-size: 0.95rem; font-weight: 600; color: var(--primary);">
+                                    http://<?= htmlspecialchars($_SERVER['HTTP_HOST'] ?? '127.0.0.1:8000') ?>
+                                </code>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <span class="badge badge-success"><i class="fa-solid fa-circle-check"></i> CORS เปิดใช้งาน</span>
+                            <span class="badge badge-info"><i class="fa-solid fa-shield-halved"></i> UTF-8 Support</span>
+                        </div>
+                    </div>
+
+                    <!-- Section 1: Books API -->
+                    <div class="api-section-header">
+                        <i class="fa-solid fa-book"></i> 1. หมวดหมู่หนังสือ (Books Endpoints - <code>/books.php</code>)
+                    </div>
+                    <div class="table-responsive" style="margin-bottom: 1.5rem;">
                         <table>
                             <thead>
                                 <tr>
-                                    <th>Method</th>
+                                    <th style="width: 90px;">Method</th>
                                     <th>API Endpoint</th>
-                                    <th>คำอธิบาย</th>
-                                    <th>พารามิเตอร์</th>
+                                    <th>ชนิดข้อมูล Request</th>
+                                    <th>ชนิดข้อมูล Response</th>
+                                    <th>คำอธิบายการทำงาน</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
                                     <td><span class="badge badge-success">GET</span></td>
                                     <td><code>/books.php</code></td>
-                                    <td>ดึงรายการหนังสือทั้งหมด (รองรับค้นหา/หมวดหมู่)</td>
-                                    <td><code>search</code>, <code>category</code></td>
+                                    <td>URL Params: <code>search</code> (String), <code>category</code> (String)</td>
+                                    <td><code>JSON Array</code> ของ Object หนังสือ</td>
+                                    <td>ดึงรายการหนังสือทั้งหมด (รองรับค้นหาและกรองหมวดหมู่)</td>
                                 </tr>
                                 <tr>
                                     <td><span class="badge badge-info">POST</span></td>
                                     <td><code>/books.php</code></td>
-                                    <td>เพิ่มหนังสือใหม่จากแอป</td>
-                                    <td>JSON Body</td>
+                                    <td><code>JSON Body</code>: <code>{title, author, price, stock, category, cover_url, rating, pages, is_featured}</code></td>
+                                    <td><code>JSON Object</code>: <code>{status: 'success', id: '...'}</code></td>
+                                    <td>เพิ่มหนังสือเล่มใหม่เข้าระบบคลัง</td>
                                 </tr>
                                 <tr>
                                     <td><span class="badge badge-warning">PUT</span></td>
                                     <td><code>/books.php</code></td>
-                                    <td>แก้ไขข้อมูลหนังสือ</td>
-                                    <td>JSON Body</td>
+                                    <td><code>JSON Body</code>: <code>{id, title, author, price, stock, ...}</code></td>
+                                    <td><code>JSON Object</code>: <code>{status: 'success', message: '...'}</code></td>
+                                    <td>แก้ไขข้อมูลหนังสือที่มีอยู่</td>
                                 </tr>
                                 <tr>
                                     <td><span class="badge badge-danger">DELETE</span></td>
                                     <td><code>/books.php?id={id}</code></td>
-                                    <td>ลบหนังสือ</td>
-                                    <td><code>id</code></td>
+                                    <td>URL Param: <code>id</code> (String)</td>
+                                    <td><code>JSON Object</code>: <code>{status: 'success', message: '...'}</code></td>
+                                    <td>ลบหนังสือออกจากฐานข้อมูล</td>
                                 </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Section 2: Auth API -->
+                    <div class="api-section-header">
+                        <i class="fa-solid fa-user-lock"></i> 2. หมวดหมู่สมาชิก & ยืนยันตัวตน (Auth Endpoints - <code>/auth.php</code>)
+                    </div>
+                    <div class="table-responsive" style="margin-bottom: 1.5rem;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 90px;">Method</th>
+                                    <th>API Endpoint</th>
+                                    <th>ชนิดข้อมูล Request</th>
+                                    <th>ชนิดข้อมูล Response</th>
+                                    <th>คำอธิบายการทำงาน</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                                 <tr>
                                     <td><span class="badge badge-info">POST</span></td>
                                     <td><code>/auth.php?action=login</code></td>
-                                    <td>เข้าสู่ระบบ (Login)</td>
-                                    <td><code>email</code>, <code>password</code></td>
+                                    <td><code>JSON / Form-Data</code>: <code>email</code> (String), <code>password</code> (String)</td>
+                                    <td><code>JSON Object</code>: <code>{status, user: {id, name, email, role}}</code></td>
+                                    <td>เข้าสู่ระบบ ตรวจสอบสิทธิ์ผู้ใช้ (Admin / Customer)</td>
                                 </tr>
                                 <tr>
                                     <td><span class="badge badge-info">POST</span></td>
                                     <td><code>/auth.php?action=register</code></td>
-                                    <td>สมัครสมาชิก (Register)</td>
-                                    <td><code>name</code>, <code>email</code>, <code>password</code></td>
+                                    <td><code>JSON / Form-Data</code>: <code>name</code> (String), <code>email</code> (String), <code>password</code> (String)</td>
+                                    <td><code>JSON Object</code>: <code>{status: 'success', user_id: '...'}</code></td>
+                                    <td>สมัครสมาชิกใหม่ (กำหนด Role เริ่มต้นเป็น Customer)</td>
                                 </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Section 3: Orders API -->
+                    <div class="api-section-header">
+                        <i class="fa-solid fa-receipt"></i> 3. หมวดหมู่คำสั่งซื้อ (Orders Endpoints - <code>/orders.php</code>)
+                    </div>
+                    <div class="table-responsive" style="margin-bottom: 1.5rem;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 90px;">Method</th>
+                                    <th>API Endpoint</th>
+                                    <th>ชนิดข้อมูล Request</th>
+                                    <th>ชนิดข้อมูล Response</th>
+                                    <th>คำอธิบายการทำงาน</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                                 <tr>
                                     <td><span class="badge badge-success">GET</span></td>
                                     <td><code>/orders.php</code></td>
-                                    <td>ดึงประวัติคำสั่งซื้อ</td>
-                                    <td><code>user_id</code> (optional)</td>
+                                    <td>URL Param: <code>user_id</code> (String - Optional)</td>
+                                    <td><code>JSON Array</code> ของ Object คำสั่งซื้อทั้งหมด</td>
+                                    <td>ดึงประวัติการสั่งซื้อ (ดึงทั้งหมด หรือเฉพาะผู้ใช้ที่ระบุ)</td>
                                 </tr>
                                 <tr>
                                     <td><span class="badge badge-info">POST</span></td>
                                     <td><code>/orders.php</code></td>
-                                    <td>สร้างคำสั่งซื้อใหม่ (Checkout)</td>
-                                    <td>JSON Body (user_id, items, total_amount)</td>
+                                    <td><code>JSON Body</code>: <code>{user_id, user_name, total_amount, payment_method, items: [...]}</code></td>
+                                    <td><code>JSON Object</code>: <code>{status: 'success', order_id: '...'}</code></td>
+                                    <td>สร้างคำสั่งซื้อใหม่ (Checkout) และตัดสต็อกสินค้าอัตโนมัติ</td>
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Section 4: Admin Actions API -->
+                    <div class="api-section-header">
+                        <i class="fa-solid fa-gears"></i> 4. หมวดหมู่จัดการระบบหลังบ้าน (Admin Actions - <code>/admin_actions.php</code>)
+                    </div>
+                    <div class="table-responsive" style="margin-bottom: 1.5rem;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 90px;">Method</th>
+                                    <th>Action Parameter</th>
+                                    <th>พารามิเตอร์ที่ใช้</th>
+                                    <th>ผลลัพธ์การทำงาน</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><span class="badge badge-info">POST</span></td>
+                                    <td><code>action=update_order_status</code></td>
+                                    <td><code>id</code> (String), <code>status</code> (String)</td>
+                                    <td>เปลี่ยนสถานะคำสั่งซื้อเดี่ยวแบบเรียลไทม์</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge badge-info">POST</span></td>
+                                    <td><code>action=bulk_update_order_status</code></td>
+                                    <td><code>ids</code> (JSON Array), <code>status</code> (String)</td>
+                                    <td>เปลี่ยนสถานะคำสั่งซื้อหลายรายการพร้อมกัน (Bulk Action)</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge badge-danger">POST</span></td>
+                                    <td><code>action=bulk_delete_orders</code></td>
+                                    <td><code>ids</code> (JSON Array ของ Order ID)</td>
+                                    <td>ลบคำสั่งซื้อที่เลือกพร้อมกันเป็นกลุ่ม</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge badge-info">POST</span></td>
+                                    <td><code>action=update_stock</code></td>
+                                    <td><code>id</code> (String), <code>type</code> ('inc'/'dec'/'set'), <code>delta</code> (Int)</td>
+                                    <td>ปรับจำนวนสต็อกสินค้าแบบด่วน (-5, -1, +1, +5 หรือกรอกเลข)</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge badge-info">POST</span></td>
+                                    <td><code>action=update_price</code></td>
+                                    <td><code>id</code> (String), <code>price</code> (Float)</td>
+                                    <td>แก้ไขราคาขายหนังสือแบบ inline</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge badge-info">POST</span></td>
+                                    <td><code>action=update_category</code></td>
+                                    <td><code>id</code> (String), <code>category</code> (String)</td>
+                                    <td>เปลี่ยนหมวดหมู่หนังสือแบบ inline</td>
+                                </tr>
+                                <tr>
+                                    <td><span class="badge badge-warning">POST</span></td>
+                                    <td><code>action=toggle_featured</code></td>
+                                    <td><code>id</code> (String)</td>
+                                    <td>สลับสถานะหนังสือแนะนำ (⭐ Featured)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Section 5: Database Schema & Data Types -->
+                    <div class="api-section-header">
+                        <i class="fa-solid fa-database"></i> 5. โครงสร้างและชนิดข้อมูลในฐานข้อมูล (Database Schema & Data Types)
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.2rem; margin-top: 10px;">
+                        <!-- Schema: books -->
+                        <div style="background:#FAF8F5; border:1px solid var(--border-color); border-radius:10px; padding:14px;">
+                            <div style="font-weight:700; color:var(--primary-dark); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                                <i class="fa-solid fa-table" style="color:var(--primary);"></i> ตาราง <code>books</code> (ข้อมูลหนังสือ)
+                            </div>
+                            <ul style="font-size:0.83rem; line-height:1.7; padding-left:20px; color:var(--text-main);">
+                                <li><code>id</code> : <span class="schema-badge">VARCHAR(50) PRIMARY KEY</span> (รหัสหนังสือ)</li>
+                                <li><code>title</code> : <span class="schema-badge">VARCHAR(255)</span> (ชื่อหนังสือ)</li>
+                                <li><code>author</code> : <span class="schema-badge">VARCHAR(255)</span> (ผู้แต่ง/สนพ.)</li>
+                                <li><code>price</code> : <span class="schema-badge">DECIMAL(10,2)</span> (ราคา บาท)</li>
+                                <li><code>stock</code> : <span class="schema-badge">INT(11)</span> (สต็อกคงเหลือ)</li>
+                                <li><code>category</code> : <span class="schema-badge">VARCHAR(100)</span> (หมวดหมู่)</li>
+                                <li><code>cover_url</code> : <span class="schema-badge">TEXT</span> (URL รูปภาพปก)</li>
+                                <li><code>description</code> : <span class="schema-badge">TEXT</span> (เรื่องย่อ/รายละเอียด)</li>
+                                <li><code>rating</code> : <span class="schema-badge">FLOAT</span> (คะแนนรีวิว)</li>
+                                <li><code>pages</code> : <span class="schema-badge">INT(11)</span> (จำนวนหน้า)</li>
+                                <li><code>is_featured</code> : <span class="schema-badge">TINYINT(1)</span> (1=แนะนำ, 0=ทั่วไป)</li>
+                            </ul>
+                        </div>
+
+                        <!-- Schema: orders -->
+                        <div style="background:#FAF8F5; border:1px solid var(--border-color); border-radius:10px; padding:14px;">
+                            <div style="font-weight:700; color:var(--primary-dark); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                                <i class="fa-solid fa-table" style="color:var(--primary);"></i> ตาราง <code>orders</code> (คำสั่งซื้อ)
+                            </div>
+                            <ul style="font-size:0.83rem; line-height:1.7; padding-left:20px; color:var(--text-main);">
+                                <li><code>id</code> : <span class="schema-badge">VARCHAR(50) PRIMARY KEY</span> (รหัสออเดอร์ เช่น CB-123456)</li>
+                                <li><code>user_id</code> : <span class="schema-badge">VARCHAR(50)</span> (รหัสผู้สั่งซื้อ)</li>
+                                <li><code>user_name</code> : <span class="schema-badge">VARCHAR(255)</span> (ชื่อลูกค้าผู้สั่งซื้อ)</li>
+                                <li><code>total_amount</code> : <span class="schema-badge">DECIMAL(10,2)</span> (ยอดชำระสุทธิ)</li>
+                                <li><code>status</code> : <span class="schema-badge">VARCHAR(50)</span> (สถานะคำสั่งซื้อ)</li>
+                                <li><code>payment_method</code> : <span class="schema-badge">VARCHAR(100)</span> (ช่องทางการชำระเงิน)</li>
+                                <li><code>items_detail</code> : <span class="schema-badge">LONGTEXT (JSON)</span> (รายการหนังสือที่สั่ง)</li>
+                                <li><code>order_date</code> : <span class="schema-badge">DATETIME</span> (วันเวลาที่ทำรายการ)</li>
+                            </ul>
+                        </div>
+
+                        <!-- Schema: users -->
+                        <div style="background:#FAF8F5; border:1px solid var(--border-color); border-radius:10px; padding:14px;">
+                            <div style="font-weight:700; color:var(--primary-dark); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                                <i class="fa-solid fa-table" style="color:var(--primary);"></i> ตาราง <code>users</code> (ผู้ใช้งาน)
+                            </div>
+                            <ul style="font-size:0.83rem; line-height:1.7; padding-left:20px; color:var(--text-main);">
+                                <li><code>id</code> : <span class="schema-badge">VARCHAR(50) PRIMARY KEY</span> (รหัสผู้ใช้งาน)</li>
+                                <li><code>name</code> : <span class="schema-badge">VARCHAR(255)</span> (ชื่อ - นามสกุล)</li>
+                                <li><code>email</code> : <span class="schema-badge">VARCHAR(255) UNIQUE</span> (อีเมล)</li>
+                                <li><code>password</code> : <span class="schema-badge">VARCHAR(255)</span> (รหัสผ่าน)</li>
+                                <li><code>role</code> : <span class="schema-badge">VARCHAR(20)</span> ('admin' / 'customer')</li>
+                                <li><code>created_at</code> : <span class="schema-badge">DATETIME</span> (วันที่สมัครสมาชิก)</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </section>
